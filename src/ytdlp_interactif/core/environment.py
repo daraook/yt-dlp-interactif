@@ -29,6 +29,23 @@ class EnvReport:
         return not self.missing
 
 
+def js_runtime_tip(
+    which: Callable[[str], str | None] = shutil.which,
+) -> str | None:
+    """Astuce FACULTATIVE (non bloquante) : runtime JS pour YouTube.
+
+    Renvoie None si Deno (utilisé par défaut par yt-dlp) est présent, sinon un
+    message informatif proposant — sans imposer — de l'installer.
+    """
+    if which("deno") is not None:
+        return None
+    return (
+        "💡 Astuce facultative : installer Deno débloque tous les formats YouTube "
+        "(4K, AV1) et retire l'avertissement JS. L'outil fonctionne déjà sans.\n"
+        "   → curl -fsSL https://deno.land/install.sh | sh"
+    )
+
+
 def check_dependencies(
     which: Callable[[str], str | None] = shutil.which,
 ) -> EnvReport:

@@ -9,7 +9,7 @@ import os
 
 import questionary
 
-from ..core.environment import check_dependencies
+from ..core.environment import check_dependencies, js_runtime_tip
 from ..core.progress import ProgressEvent
 from ..core.runner import LogLine, RunResult
 from ..intents.extract_audio import (
@@ -21,6 +21,11 @@ from ..intents.download_video import (
     VideoChoices,
     plan_download_video,
     run_download_video,
+)
+from ..intents.download_playlist import (
+    PlaylistChoices,
+    plan_download_playlist,
+    run_download_playlist,
 )
 from ..core.probe import approx_size_for_height, probe_formats, video_heights
 from .explain import explain_command
@@ -67,11 +72,16 @@ def run_app() -> None:
         print("⛔ " + report.message)
         return
 
+    tip = js_runtime_tip()
+    if tip:
+        print(tip + "\n")
+
     action = questionary.select(
         "Que veux-tu faire ?",
         choices=[
             "🎬  Télécharger une vidéo",
             "🎚️  Choisir la qualité (voir les formats réels)",
+            "📃  Télécharger une playlist / chaîne",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("📥  Autres intentions", disabled="bientôt disponible"),
             "🚪  Quitter",
@@ -86,6 +96,8 @@ def run_app() -> None:
         _flow_download_video()
     elif action.startswith("🎚️"):
         _flow_choose_quality()
+    elif action.startswith("📃"):
+        _flow_download_playlist()
     else:
         _flow_extract_audio()
 
@@ -220,6 +232,62 @@ def _flow_choose_quality() -> None:
     )
     print(f"\n  Qualité : {height}p (compatible H.264/AAC)  ·  Dossier : {plan.output_dir}")
     _confirm_and_run(plan, run_download_video)
+
+
+def _flow_download_playlist() -> None:
+    url = questionary.text(
+        "URL de la playlist / chaîne :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    media_sel = questionary.select(
+        "Type de contenu :",
+        choices=["🎬  Vidéos", "🎵  Audios (MP3)"],
+    ).ask()
+    if _cancelled(media_sel):
+        return
+    media = "audio" if media_sel.startswith("🎵") else "video"
+
+    scope = questionary.select(
+        "Étendue :",
+        choices=["Toute la playlist", "Une plage d'éléments (ex. 1-10)"],
+    ).ask()
+    if _cancelled(scope):
+        return
+    items = None
+    if scope.startswith("Une plage"):
+        items = questionary.text(
+            "Éléments (ex. 1-10, 1,3,5, 5:) :",
+            validate=lambda v: True if v.strip() else "Indique au moins un élément.",
+        ).ask()
+        if _cancelled(items):
+            return
+        items = items.strip()
+
+    max_height = None
+    if media == "video":
+        res_label = questionary.select(
+            "Qualité (résolution) :",
+            choices=list(_RESOLUTIONS),
+            default="Meilleure disponible",
+        ).ask()
+        if _cancelled(res_label):
+            return
+        max_height = _RESOLUTIONS[res_label]
+
+    choices = PlaylistChoices(url=url, media=media, max_height=max_height, items=items)
+    plan = plan_download_playlist(choices)
+
+    print("\n── Récapitulatif ──")
+    print(f"  Contenu : {'audios MP3' if media == 'audio' else 'vidéos'}  ·  "
+          f"Étendue : {'plage ' + items if items else 'toute la playlist'}")
+    print(f"  Dossier : {plan.output_dir}  (un sous-dossier par playlist)")
+    print("  Reprise : activée (archive anti-doublon — relancer reprend sans doublon)")
+
+    _confirm_and_run(plan, run_download_playlist)
 
 
 def _confirm_and_run(plan, run_fn) -> None:

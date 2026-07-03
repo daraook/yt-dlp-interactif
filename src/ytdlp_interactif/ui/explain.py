@@ -18,6 +18,8 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--embed-metadata": (False, "Écrire les tags (titre, artiste, date…) dans le fichier."),
     "--no-playlist": (False, "Ne traiter que cette vidéo, pas la playlist entière."),
     "--yes-playlist": (False, "Traiter toute la playlist du lien."),
+    "--playlist-items": (True, "Ne prendre que certains éléments (ex. 1-10, 1,3,5, 5:)."),
+    "--download-archive": (True, "Journal des vidéos déjà prises : évite de les re-télécharger."),
     "-o": (True, "Modèle de nom/chemin du fichier de sortie."),
 }
 

@@ -47,6 +47,66 @@ def build_extract_audio_command(
     return cmd
 
 
+def _video_format_selector(max_height: int | None) -> str:
+    if max_height:
+        return (
+            f"bestvideo[height<={max_height}]+bestaudio/"
+            f"best[height<={max_height}]/best"
+        )
+    return "bestvideo+bestaudio/best"
+
+
+def build_playlist_command(
+    url: str,
+    base_dir: str | Path,
+    *,
+    media: str = "video",  # "video" | "audio"
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    embed_thumbnail: bool = True,
+    embed_metadata: bool = True,
+    items: str | None = None,  # ex. "1-10", "1,3,5", "5:"
+    archive: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Commande pour télécharger une playlist/chaîne, rangée et sans doublon.
+
+    Rangement : <base>/<playlist>/NN - titre.ext. Archive persistante
+    (<base>/archive.txt) pour reprendre sans re-télécharger.
+    """
+    cmd: list[str] = [yt_dlp]
+
+    if media == "audio":
+        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
+        if embed_thumbnail and audio_format not in _SANS_POCHETTE:
+            cmd.append("--embed-thumbnail")
+    else:
+        cmd += ["-f", _video_format_selector(max_height)]
+        if prefer_compatible:
+            cmd += ["-S", "vcodec:h264,acodec:aac"]
+        cmd += ["--merge-output-format", merge_format]
+        if embed_thumbnail:
+            cmd.append("--embed-thumbnail")
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+
+    cmd.append("--yes-playlist")
+    if items:
+        cmd += ["--playlist-items", items]
+    if archive:
+        cmd += ["--download-archive", str(Path(base_dir) / "archive.txt")]
+
+    template = str(
+        Path(base_dir) / "%(playlist_title)s" / "%(playlist_index)02d - %(title)s.%(ext)s"
+    )
+    cmd += ["-o", template, url]
+    return cmd
+
+
 def build_download_video_command(
     url: str,
     output_dir: str | Path,

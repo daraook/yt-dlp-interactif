@@ -99,3 +99,13 @@ def session_dir(
     now = now if now is not None else datetime.now()
     name = f"{intention}_{now:%Y-%m-%d_%Hh%M}"
     return base / _APP_DIR / name
+
+
+def library_dir(subdir: str, *, base: Path | None = None) -> Path:
+    """Dossier STABLE (non horodaté) sous l'app — pour les archives persistantes.
+
+    Ex. les playlists : re-télécharger la même playlist doit reprendre là où on
+    s'était arrêté grâce à l'archive, donc le dossier ne doit pas changer.
+    """
+    base = base if base is not None else downloads_dir()
+    return base / _APP_DIR / subdir
