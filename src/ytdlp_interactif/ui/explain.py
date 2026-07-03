@@ -9,9 +9,11 @@ from __future__ import annotations
 # flag -> (prend_un_argument, explication)
 _EXPLAIN: dict[str, tuple[bool, str]] = {
     "-x": (False, "Extraire uniquement la piste audio (la vidéo est jetée)."),
-    "-f": (True, "Sélecteur de format : quelle piste télécharger (ici la meilleure audio)."),
+    "-f": (True, "Sélecteur de format : quelle(s) piste(s) télécharger."),
     "--audio-format": (True, "Convertir l'audio dans ce format (mp3, m4a, opus, flac, wav)."),
     "--audio-quality": (True, "Qualité audio cible : un débit (192K) ou 0 = meilleure."),
+    "--merge-output-format": (True, "Conteneur de fusion vidéo+audio (mp4, mkv…)."),
+    "-S": (True, "Tri des formats : ici préférer H.264/AAC pour une lecture universelle."),
     "--embed-thumbnail": (False, "Incruster la miniature comme pochette d'album."),
     "--embed-metadata": (False, "Écrire les tags (titre, artiste, date…) dans le fichier."),
     "--no-playlist": (False, "Ne traiter que cette vidéo, pas la playlist entière."),

@@ -5,6 +5,8 @@ noyau (environment / intents / runner) et affiche les événements.
 """
 from __future__ import annotations
 
+import os
+
 import questionary
 
 from ..core.environment import check_dependencies
@@ -14,6 +16,11 @@ from ..intents.extract_audio import (
     AudioChoices,
     plan_extract_audio,
     run_extract_audio,
+)
+from ..intents.download_video import (
+    VideoChoices,
+    plan_download_video,
+    run_download_video,
 )
 from .explain import explain_command
 
@@ -25,10 +32,29 @@ _QUALITES = {
     "Meilleure disponible": "0",
 }
 
+# Libellé de résolution -> hauteur max (None = meilleure).
+_RESOLUTIONS = {
+    "Meilleure disponible": None,
+    "1080p (Full HD)": 1080,
+    "720p (HD)": 720,
+    "480p (léger)": 480,
+}
+
 
 def _cancelled(value) -> bool:
     """questionary renvoie None si l'utilisateur fait Ctrl+C / Échap."""
     return value is None
+
+
+def _hide_hidden(path: str) -> bool:
+    """Filtre d'autocomplétion : masque les entrées cachées (nom commençant par '.').
+
+    Renvoie True pour AFFICHER l'entrée. '.' et '..' restent visibles (navigation).
+    """
+    name = os.path.basename(os.path.normpath(path))
+    if name in (".", ".."):
+        return True
+    return not name.startswith(".")
 
 
 def run_app() -> None:
@@ -43,6 +69,7 @@ def run_app() -> None:
     action = questionary.select(
         "Que veux-tu faire ?",
         choices=[
+            "🎬  Télécharger une vidéo",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("📥  Autres intentions", disabled="bientôt disponible"),
             "🚪  Quitter",
@@ -53,7 +80,10 @@ def run_app() -> None:
         print("À bientôt 👋")
         return
 
-    _flow_extract_audio()
+    if action.startswith("🎬"):
+        _flow_download_video()
+    else:
+        _flow_extract_audio()
 
 
 def _flow_extract_audio() -> None:
@@ -89,19 +119,7 @@ def _flow_extract_audio() -> None:
           f"Tags : {'oui' if choices.embed_metadata else 'non'}")
     print(f"  Dossier : {plan.output_dir}")
 
-    if questionary.confirm(
-        "Voir la commande yt-dlp exécutée (et son explication) ?", default=False
-    ).ask():
-        print("\n  $ " + " ".join(plan.command) + "\n")
-        for line in explain_command(plan.command):
-            print(line)
-        print()
-
-    if not questionary.confirm("Lancer maintenant ?", default=True).ask():
-        print("Annulé.")
-        return
-
-    _execute(plan)
+    _confirm_and_run(plan, run_extract_audio)
 
 
 def _customize(url: str) -> AudioChoices | None:
@@ -130,7 +148,11 @@ def _customize(url: str) -> AudioChoices | None:
     if questionary.confirm(
         "Choisir un dossier de sortie ? (sinon dossier auto daté)", default=False
     ).ask():
-        chosen = questionary.path("Dossier :").ask()
+        chosen = questionary.path(
+            "Dossier :",
+            only_directories=True,
+            file_filter=_hide_hidden,
+        ).ask()
         if not _cancelled(chosen) and chosen.strip():
             output_dir = chosen.strip()
 
@@ -144,20 +166,37 @@ def _customize(url: str) -> AudioChoices | None:
     )
 
 
-def _execute(plan) -> None:
+def _confirm_and_run(plan, run_fn) -> None:
+    """Toggle « voir la commande » (Q3) + confirmation + exécution, commun à tous les flows."""
+    if questionary.confirm(
+        "Voir la commande yt-dlp exécutée (et son explication) ?", default=False
+    ).ask():
+        print("\n  $ " + " ".join(plan.command) + "\n")
+        for line in explain_command(plan.command):
+            print(line)
+        print()
+
+    if not questionary.confirm("Lancer maintenant ?", default=True).ask():
+        print("Annulé.")
+        return
+
+    _execute(run_fn(plan), plan.output_dir)
+
+
+def _execute(events, output_dir) -> None:
     print()
     logs: list[str] = []
     postproc_announced = False
     result: RunResult | None = None
 
     try:
-        for ev in run_extract_audio(plan):
+        for ev in events:
             if isinstance(ev, ProgressEvent):
                 if ev.phase == "download" and ev.percent is not None:
                     print(f"\r  ⬇️  Téléchargement… {ev.percent:5.1f}%", end="", flush=True)
                 elif ev.phase == "postproc" and not postproc_announced:
                     postproc_announced = True
-                    print("\r  🎧  Conversion audio…                    ")
+                    print("\r  ⚙️  Finalisation (fusion / conversion)…        ")
             elif isinstance(ev, LogLine):
                 logs.append(ev.text)
             elif isinstance(ev, RunResult):
@@ -168,9 +207,9 @@ def _execute(plan) -> None:
 
     print()
     if result is not None and result.ok:
-        files = sorted(p.name for p in plan.output_dir.glob("*")) if plan.output_dir.exists() else []
+        files = sorted(p.name for p in output_dir.glob("*")) if output_dir.exists() else []
         print("✅  Terminé !")
-        print(f"   📁 {plan.output_dir}")
+        print(f"   📁 {output_dir}")
         for f in files:
             print(f"   • {f}")
     else:
@@ -181,3 +220,98 @@ def _execute(plan) -> None:
         if questionary.confirm("Voir les détails techniques ?", default=False).ask():
             for line in logs[-25:]:
                 print("   " + line)
+
+
+def _flow_download_video() -> None:
+    url = questionary.text(
+        "URL de la vidéo :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    mode = questionary.select(
+        "Réglages :",
+        choices=[
+            "⚡ Rapide (meilleure qualité, MP4, tags, dossier auto)",
+            "🎛️  Personnaliser",
+        ],
+    ).ask()
+    if _cancelled(mode):
+        return
+
+    choices = VideoChoices(url=url)
+    if mode.startswith("🎛️"):
+        choices = _customize_video(url)
+        if choices is None:
+            return
+
+    plan = plan_download_video(choices)
+
+    res_label = next(
+        (k for k, v in _RESOLUTIONS.items() if v == choices.max_height),
+        "Meilleure disponible",
+    )
+    prio = "compatible (H.264/AAC)" if choices.prefer_compatible else "qualité max"
+    print("\n── Récapitulatif ──")
+    print(f"  Qualité : {res_label}  ·  Conteneur : {choices.merge_format}  ·  Priorité : {prio}")
+    print(f"  Pochette: {'oui' if choices.embed_thumbnail else 'non'}  ·  "
+          f"Tags : {'oui' if choices.embed_metadata else 'non'}")
+    print(f"  Dossier : {plan.output_dir}")
+
+    _confirm_and_run(plan, run_download_video)
+
+
+def _customize_video(url: str) -> VideoChoices | None:
+    res_label = questionary.select(
+        "Qualité (résolution) :",
+        choices=list(_RESOLUTIONS),
+        default="Meilleure disponible",
+    ).ask()
+    if _cancelled(res_label):
+        return None
+
+    priorite = questionary.select(
+        "Priorité :",
+        choices=[
+            "🛡️  Compatibilité maximale (H.264/AAC, lit partout) — ~1080p",
+            "💎  Qualité maximale (AV1/VP9, jusqu'en 4K, moins compatible)",
+        ],
+    ).ask()
+    if _cancelled(priorite):
+        return None
+    prefer_compatible = priorite.startswith("🛡️")
+
+    container = questionary.select(
+        "Conteneur :", choices=["mp4", "mkv", "webm"], default="mp4"
+    ).ask()
+    if _cancelled(container):
+        return None
+
+    thumb = questionary.confirm("Incruster la miniature ?", default=False).ask()
+    if _cancelled(thumb):
+        return None
+    meta = questionary.confirm("Écrire les tags (métadonnées) ?", default=True).ask()
+    if _cancelled(meta):
+        return None
+
+    output_dir = None
+    if questionary.confirm(
+        "Choisir un dossier de sortie ? (sinon dossier auto daté)", default=False
+    ).ask():
+        chosen = questionary.path(
+            "Dossier :", only_directories=True, file_filter=_hide_hidden
+        ).ask()
+        if not _cancelled(chosen) and chosen.strip():
+            output_dir = chosen.strip()
+
+    return VideoChoices(
+        url=url,
+        max_height=_RESOLUTIONS[res_label],
+        merge_format=container,
+        prefer_compatible=prefer_compatible,
+        embed_thumbnail=thumb,
+        embed_metadata=meta,
+        output_dir=output_dir,
+    )

@@ -45,3 +45,45 @@ def build_extract_audio_command(
     template = str(Path(output_dir) / "%(title)s.%(ext)s")
     cmd += ["-o", template, url]
     return cmd
+
+
+def build_download_video_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    max_height: int | None = None,
+    merge_format: str = "mp4",
+    prefer_compatible: bool = True,
+    embed_thumbnail: bool = False,
+    embed_metadata: bool = True,
+    playlist: bool = False,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Commande pour télécharger la vidéo (image + son fusionnés).
+
+    `max_height` limite la résolution (720, 1080…) ; None = meilleure disponible.
+    `merge_format` = conteneur de fusion vidéo+audio (mp4 par défaut).
+    `prefer_compatible` (défaut True) : trie les formats pour préférer H.264/AAC,
+    qui se lisent partout (repli gracieux si indisponibles). False = qualité max
+    brute (peut donner AV1/VP9, moins compatible mais 4K/8K possible).
+    """
+    if max_height:
+        fmt = (
+            f"bestvideo[height<={max_height}]+bestaudio/"
+            f"best[height<={max_height}]/best"
+        )
+    else:
+        fmt = "bestvideo+bestaudio/best"
+
+    cmd: list[str] = [yt_dlp, "-f", fmt, "--merge-output-format", merge_format]
+    if prefer_compatible:
+        cmd += ["-S", "vcodec:h264,acodec:aac"]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+    if embed_thumbnail:
+        cmd.append("--embed-thumbnail")
+    cmd.append("--yes-playlist" if playlist else "--no-playlist")
+
+    template = str(Path(output_dir) / "%(title)s.%(ext)s")
+    cmd += ["-o", template, url]
+    return cmd
