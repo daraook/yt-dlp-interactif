@@ -22,6 +22,7 @@ from ..intents.download_video import (
     plan_download_video,
     run_download_video,
 )
+from ..core.probe import approx_size_for_height, probe_formats, video_heights
 from .explain import explain_command
 
 _QUALITES = {
@@ -70,6 +71,7 @@ def run_app() -> None:
         "Que veux-tu faire ?",
         choices=[
             "🎬  Télécharger une vidéo",
+            "🎚️  Choisir la qualité (voir les formats réels)",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("📥  Autres intentions", disabled="bientôt disponible"),
             "🚪  Quitter",
@@ -82,6 +84,8 @@ def run_app() -> None:
 
     if action.startswith("🎬"):
         _flow_download_video()
+    elif action.startswith("🎚️"):
+        _flow_choose_quality()
     else:
         _flow_extract_audio()
 
@@ -164,6 +168,58 @@ def _customize(url: str) -> AudioChoices | None:
         embed_metadata=meta,
         output_dir=output_dir,
     )
+
+
+def _fmt_size(nbytes: int | None) -> str:
+    return f"  (~{round(nbytes / 1_000_000)} Mo)" if nbytes else ""
+
+
+def _flow_choose_quality() -> None:
+    url = questionary.text(
+        "URL de la vidéo :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    print("\n🔍  Analyse des formats disponibles…")
+    try:
+        formats = probe_formats(url)
+    except Exception:
+        print("❌  Impossible d'analyser cette URL (voir le message ci-dessus).")
+        return
+
+    heights = video_heights(formats)
+    if not heights:
+        print("Aucun format vidéo exploitable trouvé pour cette URL.")
+        return
+
+    audio_label = "🎵  Audio seulement (meilleur, MP3)"
+    label_to_height: dict[str, int] = {}
+    menu: list[str] = []
+    for h in heights:
+        label = f"{h}p{_fmt_size(approx_size_for_height(formats, h))}"
+        label_to_height[label] = h
+        menu.append(label)
+    menu.append(audio_label)
+
+    sel = questionary.select("Qualité disponible :", choices=menu).ask()
+    if _cancelled(sel):
+        return
+
+    if sel == audio_label:
+        plan = plan_extract_audio(AudioChoices(url=url))
+        print(f"\n  Dossier : {plan.output_dir}")
+        _confirm_and_run(plan, run_extract_audio)
+        return
+
+    height = label_to_height[sel]
+    plan = plan_download_video(
+        VideoChoices(url=url, max_height=height, prefer_compatible=True)
+    )
+    print(f"\n  Qualité : {height}p (compatible H.264/AAC)  ·  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_download_video)
 
 
 def _confirm_and_run(plan, run_fn) -> None:
