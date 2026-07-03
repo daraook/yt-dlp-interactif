@@ -20,6 +20,12 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--yes-playlist": (False, "Traiter toute la playlist du lien."),
     "--playlist-items": (True, "Ne prendre que certains éléments (ex. 1-10, 1,3,5, 5:)."),
     "--download-archive": (True, "Journal des vidéos déjà prises : évite de les re-télécharger."),
+    "--skip-download": (False, "Ne pas télécharger la vidéo (récupérer seulement les annexes)."),
+    "--write-subs": (False, "Récupérer les sous-titres (fichiers séparés)."),
+    "--write-auto-subs": (False, "Inclure aussi les sous-titres auto-générés."),
+    "--sub-langs": (True, "Langues de sous-titres à récupérer (ex. fr,en ou all)."),
+    "--convert-subs": (True, "Convertir les sous-titres dans ce format (srt, vtt…)."),
+    "--embed-subs": (False, "Incruster les sous-titres dans le fichier vidéo."),
     "-o": (True, "Modèle de nom/chemin du fichier de sortie."),
 }
 

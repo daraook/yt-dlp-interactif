@@ -27,8 +27,21 @@ from ..intents.download_playlist import (
     plan_download_playlist,
     run_download_playlist,
 )
+from ..intents.subtitles import (
+    SubtitleChoices,
+    plan_subtitles,
+    run_subtitles,
+)
 from ..core.probe import approx_size_for_height, probe_formats, video_heights
 from .explain import explain_command
+
+_SUB_LANGS = {
+    "Français (fr)": "fr",
+    "Anglais (en)": "en",
+    "Français + Anglais": "fr,en",
+    "Toutes les langues (all)": "all",
+    "Autre (saisir les codes)": None,
+}
 
 _QUALITES = {
     "128 kbps (léger)": "128K",
@@ -82,6 +95,7 @@ def run_app() -> None:
             "🎬  Télécharger une vidéo",
             "🎚️  Choisir la qualité (voir les formats réels)",
             "📃  Télécharger une playlist / chaîne",
+            "💬  Sous-titres",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("📥  Autres intentions", disabled="bientôt disponible"),
             "🚪  Quitter",
@@ -98,6 +112,8 @@ def run_app() -> None:
         _flow_choose_quality()
     elif action.startswith("📃"):
         _flow_download_playlist()
+    elif action.startswith("💬"):
+        _flow_subtitles()
     else:
         _flow_extract_audio()
 
@@ -232,6 +248,69 @@ def _flow_choose_quality() -> None:
     )
     print(f"\n  Qualité : {height}p (compatible H.264/AAC)  ·  Dossier : {plan.output_dir}")
     _confirm_and_run(plan, run_download_video)
+
+
+def _flow_subtitles() -> None:
+    url = questionary.text(
+        "URL de la vidéo :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    mode_sel = questionary.select(
+        "Que veux-tu ?",
+        choices=[
+            "🎬  La vidéo AVEC ses sous-titres",
+            "💬  Les sous-titres seulement (fichiers .srt)",
+        ],
+    ).ask()
+    if _cancelled(mode_sel):
+        return
+    mode = "subs_only" if mode_sel.startswith("💬") else "video"
+
+    lang_label = questionary.select(
+        "Langue(s) des sous-titres :", choices=list(_SUB_LANGS),
+        default="Français + Anglais",
+    ).ask()
+    if _cancelled(lang_label):
+        return
+    langs = _SUB_LANGS[lang_label]
+    if langs is None:  # « Autre »
+        langs = questionary.text(
+            "Codes de langue (ex. fr,en,es) :",
+            validate=lambda v: True if v.strip() else "Indique au moins une langue.",
+        ).ask()
+        if _cancelled(langs):
+            return
+        langs = langs.strip()
+
+    auto = questionary.confirm(
+        "Inclure les sous-titres auto-générés ?", default=True
+    ).ask()
+    if _cancelled(auto):
+        return
+
+    embed = False
+    if mode == "video":
+        embed = questionary.confirm(
+            "Incruster les sous-titres dans la vidéo ?", default=False
+        ).ask()
+        if _cancelled(embed):
+            return
+
+    plan = plan_subtitles(
+        SubtitleChoices(url=url, mode=mode, langs=langs, auto=auto, embed=embed)
+    )
+
+    print("\n── Récapitulatif ──")
+    print(f"  Cible   : {'sous-titres seuls' if mode == 'subs_only' else 'vidéo + sous-titres'}")
+    print(f"  Langues : {langs}  ·  Auto-générés : {'oui' if auto else 'non'}"
+          + (f"  ·  Incrustés : {'oui' if embed else 'non'}" if mode == 'video' else ""))
+    print(f"  Dossier : {plan.output_dir}")
+
+    _confirm_and_run(plan, run_subtitles)
 
 
 def _flow_download_playlist() -> None:

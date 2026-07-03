@@ -107,6 +107,54 @@ def build_playlist_command(
     return cmd
 
 
+def build_subtitles_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    mode: str = "video",  # "video" (vidéo + ST) | "subs_only" (ST seuls)
+    langs: str = "fr,en",
+    auto: bool = True,  # inclure les ST auto-générés
+    sub_format: str = "srt",
+    embed: bool = False,  # incruster dans la vidéo (mode "video" seulement)
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Commande pour récupérer les sous-titres, avec ou sans la vidéo.
+
+    `mode="subs_only"` ne télécharge que les fichiers de sous-titres.
+    `embed` incruste les ST dans la vidéo (ignoré en subs_only).
+    """
+    cmd: list[str] = [yt_dlp]
+
+    if mode == "subs_only":
+        cmd.append("--skip-download")
+    else:
+        cmd += ["-f", _video_format_selector(max_height)]
+        if prefer_compatible:
+            cmd += ["-S", "vcodec:h264,acodec:aac"]
+        cmd += ["--merge-output-format", merge_format]
+
+    cmd.append("--write-subs")
+    if auto:
+        cmd.append("--write-auto-subs")
+    cmd += ["--sub-langs", langs]
+    if sub_format:
+        cmd += ["--convert-subs", sub_format]
+    if mode != "subs_only":
+        if embed:
+            cmd.append("--embed-subs")
+        if embed_metadata:
+            cmd.append("--embed-metadata")
+
+    cmd.append("--no-playlist")
+    template = str(Path(output_dir) / "%(title)s.%(ext)s")
+    cmd += ["-o", template, url]
+    return cmd
+
+
 def build_download_video_command(
     url: str,
     output_dir: str | Path,
