@@ -128,44 +128,62 @@ def run_app() -> None:
     if tip:
         print(tip + "\n")
 
-    # Libellé -> handler. Séparateurs pour grouper un menu devenu riche.
-    actions = {
-        "🎬  Télécharger une vidéo": _flow_download_video,
-        "🎵  Extraire l'audio (MP3, …)": _flow_extract_audio,
-        "🎚️  Choisir la qualité (formats réels)": _flow_choose_quality,
-        "📃  Télécharger une playlist / chaîne": _flow_download_playlist,
-        "🗂️  Fichier de liens (lot)": _flow_batch,
-        "✂️  Découper un extrait (HH:MM-HH:MM)": _flow_section,
-        "🔄  Convertir / changer de format": _flow_convert,
-        "🚫  SponsorBlock (retirer sponsors…)": _flow_sponsorblock,
-        "💬  Sous-titres": _flow_subtitles,
-        "🖼️  Miniature & métadonnées": _flow_extras,
-        "🔓  Débloquer (privé / géo / âge)": _flow_unlock,
-        "📺  Live / première": _flow_live,
-        "⚡  Vitesse / réseau": _flow_network,
-        "🔍  Inspecter (infos sans télécharger)": _flow_inspect,
-        "⬆️  Mettre à jour yt-dlp": _flow_update,
-    }
-    labels = list(actions)
+    # (libellé, handler, description affichée sous le curseur). Groupé par séparateurs.
+    menu = [
+        ("🎬  Télécharger une vidéo", _flow_download_video,
+         "La vidéo complète (image + son). Format compatible H.264/AAC par défaut : lit partout."),
+        ("🎵  Extraire l'audio (MP3, …)", _flow_extract_audio,
+         "Récupère seulement le son, converti en MP3 (ou m4a/opus/flac/wav), pochette + tags."),
+        ("🎚️  Choisir la qualité (formats réels)", _flow_choose_quality,
+         "Analyse la vidéo et propose un menu des résolutions réellement disponibles, avec tailles."),
+        ("📃  Télécharger une playlist / chaîne", _flow_download_playlist,
+         "Toute une playlist/chaîne, rangée par dossier et numérotée. Reprend sans re-télécharger."),
+        ("🗂️  Fichier de liens (lot)", _flow_batch,
+         "Plusieurs liens d'un coup : collés un par un, ou depuis un fichier .txt."),
+        ("✂️  Découper un extrait", _flow_section,
+         "Ne récupère qu'une portion temporelle (ex. 1:30 → 2:45), coupe précise."),
+        ("🔄  Convertir / changer de format", _flow_convert,
+         "Change le conteneur (mp4/mkv/webm…). Remux = rapide sans perte ; réencoder = change le codec."),
+        ("🚫  SponsorBlock", _flow_sponsorblock,
+         "Retire (ou marque en chapitres) les segments sponsors, intros, outros, auto-promo…"),
+        ("💬  Sous-titres", _flow_subtitles,
+         "Récupère les sous-titres (avec ou sans la vidéo), par langue, incrustables, en .srt."),
+        ("🖼️  Miniature & métadonnées", _flow_extras,
+         "Gère la miniature (enregistrer/incruster) et les métadonnées (tags, fichier .json d'infos)."),
+        ("🔓  Débloquer (privé / géo / âge)", _flow_unlock,
+         "Utilise les cookies de ton navigateur pour les vidéos privées/membres/âge, + contournement géo."),
+        ("📺  Live / première", _flow_live,
+         "Enregistre un direct ou une première : depuis le début, et/ou en attendant qu'il commence."),
+        ("⚡  Vitesse / réseau", _flow_network,
+         "Règle le débit (brider) et le nombre de téléchargements en parallèle."),
+        ("🔍  Inspecter (infos sans télécharger)", _flow_inspect,
+         "Affiche titre, durée, qualités et sous-titres disponibles. Ne télécharge rien."),
+        ("⬆️  Mettre à jour yt-dlp", _flow_update,
+         "Vérifie et installe la dernière version de yt-dlp."),
+    ]
+    handlers = {label: fn for label, fn, _ in menu}
+    C = lambda i: questionary.Choice(menu[i][0], description=menu[i][2])
     choices = [
         questionary.Separator("── Télécharger ──"),
-        *labels[0:5],
+        *[C(i) for i in range(0, 5)],
         questionary.Separator("── Transformer ──"),
-        *labels[5:10],
+        *[C(i) for i in range(5, 10)],
         questionary.Separator("── Cas particuliers ──"),
-        *labels[10:13],
+        *[C(i) for i in range(10, 13)],
         questionary.Separator("── Outils ──"),
-        *labels[13:15],
+        *[C(i) for i in range(13, 15)],
         questionary.Separator(" "),
         "🚪  Quitter",
     ]
 
-    action = questionary.select("Que veux-tu faire ?", choices=choices).ask()
+    action = questionary.select(
+        "Que veux-tu faire ?", choices=choices, show_description=True
+    ).ask()
 
     if _cancelled(action) or action.startswith("🚪"):
         print("À bientôt 👋")
         return
-    actions[action]()
+    handlers[action]()
 
 
 def _flow_extract_audio() -> None:
@@ -424,9 +442,14 @@ def _flow_sponsorblock() -> None:
     action_sel = questionary.select(
         "Que faire des segments ?",
         choices=[
-            "✂️  Les couper (retirer de la vidéo)",
-            "🔖  Les marquer en chapitres (garder, mais repérables)",
+            questionary.Choice(
+                "✂️  Les couper (retirer de la vidéo)",
+                description="Les segments sont supprimés du fichier final."),
+            questionary.Choice(
+                "🔖  Les marquer en chapitres",
+                description="La vidéo reste entière, mais les segments deviennent des chapitres repérables."),
         ],
+        show_description=True,
     ).ask()
     if _cancelled(action_sel):
         return
@@ -477,9 +500,14 @@ def _flow_subtitles() -> None:
     mode_sel = questionary.select(
         "Que veux-tu ?",
         choices=[
-            "🎬  La vidéo AVEC ses sous-titres",
-            "💬  Les sous-titres seulement (fichiers .srt)",
+            questionary.Choice(
+                "🎬  La vidéo AVEC ses sous-titres",
+                description="Télécharge la vidéo et ses sous-titres (incrustables)."),
+            questionary.Choice(
+                "💬  Les sous-titres seulement",
+                description="Juste les fichiers .srt, sans télécharger la vidéo."),
         ],
+        show_description=True,
     ).ask()
     if _cancelled(mode_sel):
         return
@@ -597,7 +625,14 @@ def _ask_resolution():
 
 def _ask_media():
     """(ok, media) parmi video/audio."""
-    sel = questionary.select("Type de contenu :", choices=["🎬  Vidéo", "🎵  Audio (MP3)"]).ask()
+    sel = questionary.select(
+        "Type de contenu :",
+        choices=[
+            questionary.Choice("🎬  Vidéo", description="Image + son."),
+            questionary.Choice("🎵  Audio (MP3)", description="Le son seul, converti en MP3."),
+        ],
+        show_description=True,
+    ).ask()
     if _cancelled(sel):
         return False, None
     return True, ("audio" if sel.startswith("🎵") else "video")
@@ -630,9 +665,14 @@ def _flow_convert() -> None:
     mode = questionary.select(
         "Méthode :",
         choices=[
-            "⚡ Remux (rapide, sans perte — change juste le conteneur)",
-            "🔁 Réencoder (plus lent, change vraiment le codec)",
+            questionary.Choice(
+                "⚡ Remux (rapide, sans perte)",
+                description="Change seulement l'emballage (conteneur). Instantané, qualité identique."),
+            questionary.Choice(
+                "🔁 Réencoder",
+                description="Recompresse la vidéo dans le nouveau codec. Plus lent, peut perdre un peu de qualité."),
         ],
+        show_description=True,
     ).ask()
     if _cancelled(mode):
         return
@@ -942,9 +982,14 @@ def _customize_video(url: str) -> VideoChoices | None:
     priorite = questionary.select(
         "Priorité :",
         choices=[
-            "🛡️  Compatibilité maximale (H.264/AAC, lit partout) — ~1080p",
-            "💎  Qualité maximale (AV1/VP9, jusqu'en 4K, moins compatible)",
+            questionary.Choice(
+                "🛡️  Compatibilité maximale",
+                description="H.264/AAC : se lit sur tous les appareils/lecteurs. Plafonne vers 1080p."),
+            questionary.Choice(
+                "💎  Qualité maximale",
+                description="Meilleure image possible (AV1/VP9, jusqu'en 4K/8K) mais illisible sur vieux lecteurs."),
         ],
+        show_description=True,
     ).ask()
     if _cancelled(priorite):
         return None
