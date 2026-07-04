@@ -11,4 +11,4 @@ def test_chaque_option_est_expliquee_et_url_identifiee():
     assert "-f bestaudio/best" in joined
     assert "--audio-quality 192K" in joined
     # L'URL est identifiée comme telle.
-    assert any("l'URL à télécharger" in l and "https://x/v" in l for l in lines)
+    assert any("l'URL à télécharger" in line and "https://x/v" in line for line in lines)

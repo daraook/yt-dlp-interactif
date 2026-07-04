@@ -1,6 +1,5 @@
 """Tests du constructeur « superset » composable (combos arbitraires)."""
 from datetime import datetime
-from pathlib import Path
 
 from ytdlp_interactif.core.command_builder import build_custom_command
 from ytdlp_interactif.core.runner import RunResult

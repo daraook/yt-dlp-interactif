@@ -1,5 +1,4 @@
 """Tests de la commande playlist + orchestration (purs)."""
-from datetime import datetime
 from pathlib import Path
 
 from ytdlp_interactif.core.command_builder import build_playlist_command

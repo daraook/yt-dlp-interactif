@@ -46,6 +46,13 @@ from ..intents.unlock import UnlockChoices, plan_unlock, run_unlock
 from ..intents.network import NetworkChoices, plan_network, run_network
 from ..intents.custom import CustomChoices, plan_custom, run_custom
 from ..core.search import search
+from ..core.probe import (
+    approx_size_for_height,
+    probe_formats,
+    probe_info,
+    video_heights,
+)
+from .explain import explain_command
 
 # Débit -> valeur yt-dlp (None = illimité).
 _RATES = {
@@ -68,13 +75,6 @@ _SB_CATEGORIES = {
     "Hors-sujet musical (clips)": "music_offtopic",
     "Remplissage (digressions)": "filler",
 }
-from ..core.probe import (
-    approx_size_for_height,
-    probe_formats,
-    probe_info,
-    video_heights,
-)
-from .explain import explain_command
 
 _SUB_LANGS = {
     "Français (fr)": "fr",
@@ -168,7 +168,9 @@ def run_app() -> None:
          "Cherche par mots-clés, liste vidéos ET playlists trouvées, puis télécharge ton choix."),
     ]
     handlers = {label: fn for label, fn, _ in menu}
-    C = lambda i: questionary.Choice(menu[i][0], description=menu[i][2])
+
+    def C(i):
+        return questionary.Choice(menu[i][0], description=menu[i][2])
     choices = [
         questionary.Separator("── Sur mesure ──"),
         C(15), C(16),
@@ -399,11 +401,13 @@ def _flow_section() -> None:
         return
     url = url.strip()
 
-    _t = lambda v: True if v.strip() else "Indique un temps (ex. 1:30, 0:01:30 ou 90)."
-    start = questionary.text("Début (ex. 1:30) :", validate=_t).ask()
+    def _valid_time(v):
+        return True if v.strip() else "Indique un temps (ex. 1:30, 0:01:30 ou 90)."
+
+    start = questionary.text("Début (ex. 1:30) :", validate=_valid_time).ask()
     if _cancelled(start):
         return
-    end = questionary.text("Fin (ex. 2:45) :", validate=_t).ask()
+    end = questionary.text("Fin (ex. 2:45) :", validate=_valid_time).ask()
     if _cancelled(end):
         return
 
@@ -472,7 +476,7 @@ def _flow_sponsorblock() -> None:
     ).ask()
     if _cancelled(selected):
         return
-    codes = [_SB_CATEGORIES[l] for l in selected] if selected else ["sponsor"]
+    codes = [_SB_CATEGORIES[label] for label in selected] if selected else ["sponsor"]
     categories = ",".join(codes)
 
     res_label = questionary.select(
@@ -1011,12 +1015,12 @@ def _flow_custom() -> None:
                            default=False).ask():
         cats = questionary.checkbox(
             "Catégories :",
-            choices=[questionary.Choice(l, checked=(c == "sponsor"))
-                     for l, c in _SB_CATEGORIES.items()],
+            choices=[questionary.Choice(label, checked=(code == "sponsor"))
+                     for label, code in _SB_CATEGORIES.items()],
         ).ask()
         if _cancelled(cats):
             return
-        codes = [_SB_CATEGORIES[l] for l in cats] if cats else ["sponsor"]
+        codes = [_SB_CATEGORIES[label] for label in cats] if cats else ["sponsor"]
         kw["sponsorblock_categories"] = ",".join(codes)
         resume.append("sans sponsors")
 
@@ -1103,11 +1107,15 @@ def _execute(events, output_dir) -> None:
 
     print()
     if result is not None and result.ok:
-        files = sorted(p.name for p in output_dir.glob("*")) if output_dir.exists() else []
+        # Listing récursif (les playlists rangent dans des sous-dossiers).
+        files = sorted(p for p in output_dir.rglob("*") if p.is_file()) \
+            if output_dir.exists() else []
         print("✅  Terminé !")
         print(f"   📁 {output_dir}")
-        for f in files:
-            print(f"   • {f}")
+        for p in files[:10]:
+            print(f"   • {p.relative_to(output_dir)}")
+        if len(files) > 10:
+            print(f"   … et {len(files) - 10} autres fichiers")
     else:
         print("❌  Échec du téléchargement.")
         errors = result.errors if result else []
