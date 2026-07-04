@@ -8,22 +8,10 @@ Cet outil le transforme en **assistant interactif** : au lieu d'un terminal vide
 attend une commande cryptique, il se présente, propose des choix clairs, pose les bonnes
 questions au bon moment, et exécute à ta place.
 
-```
-? Que veux-tu faire ?  (utilise ↑↓ puis Entrée)
- ── Sur mesure ──
- » 🧩  Personnalisé (tout combiner)
-   🔎  Chercher (vidéos & playlists)
- ── Télécharger ──
-   🎬  Télécharger une vidéo
-   🎵  Extraire l'audio (MP3, …)
-   🎚️  Choisir la qualité (formats réels)
-   📃  Télécharger une playlist / chaîne
-   🗂️  Fichier de liens (lot)
- ── Transformer ──
-   ✂️  Découper un extrait  ·  🔄 Convertir  ·  🚫 SponsorBlock  ·  💬 Sous-titres  ·  🖼️ Miniature & métadonnées
-   …
-   La vidéo complète (image + son). Format compatible H.264/AAC par défaut : lit partout.
-```
+![Démonstration de yt-dlp interactif](docs/demo.gif)
+
+*Menus guidés avec descriptions, réglages par défaut intelligents, et la commande
+`yt-dlp` expliquée à la demande.*
 
 > Premier d'une série d'outils visant à donner une interface interactive à des programmes
 > en ligne de commande. La méthode employée est documentée dans

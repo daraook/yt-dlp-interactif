@@ -1,0 +1,58 @@
+name: 🐞 Signaler un bug
+description: Quelque chose ne fonctionne pas comme prévu.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème 🙏
+        Reste général sur les liens : **n'inclus pas de données personnelles**.
+  - type: textarea
+    id: what
+    attributes:
+      label: Ce que tu faisais
+      description: Quelle intention du menu, et sur quel site / type de lien ?
+      placeholder: "Ex. : Extraire l'audio, sur une vidéo YouTube."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ce que tu attendais
+      placeholder: "Ex. : obtenir un fichier MP3."
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Ce qui s'est passé
+      description: >
+        Colle le message affiché. En cas d'échec, choisis « Voir les détails
+        techniques » dans l'outil et colle ce qui apparaît.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Système d'exploitation
+      placeholder: "Ex. : Ubuntu 24.04 / Windows 11 / macOS 14"
+    validations:
+      required: true
+  - type: input
+    id: ytdlp
+    attributes:
+      label: Version de yt-dlp
+      description: "Résultat de : yt-dlp --version"
+      placeholder: "Ex. : 2026.06.09"
+    validations:
+      required: true
+  - type: checkboxes
+    id: prereqs
+    attributes:
+      label: Vérifications
+      options:
+        - label: yt-dlp et ffmpeg sont installés et à jour
+          required: true
+        - label: J'ai cherché si le problème était déjà signalé
+          required: true

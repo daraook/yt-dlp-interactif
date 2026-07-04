@@ -1,0 +1,29 @@
+name: 💡 Proposer une amélioration
+description: Une idée, une intention manquante, un site à mieux gérer.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "Toute idée est la bienvenue — merci d'y contribuer ✨"
+  - type: textarea
+    id: need
+    attributes:
+      label: Le besoin
+      description: Quel problème ou manque veux-tu résoudre ?
+      placeholder: "Ex. : pouvoir télécharger seulement les chapitres d'une vidéo."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: La solution imaginée
+      description: À quoi ressemblerait le comportement idéal dans l'outil ?
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte / alternatives
+      description: Autres pistes envisagées, exemples, captures…
+    validations:
+      required: false
