@@ -10,6 +10,7 @@ import os
 import questionary
 
 from ..core.environment import check_dependencies, js_runtime_tip
+from ..core.errors import humanize_error
 from ..core.progress import ProgressEvent
 from ..core.runner import LogLine, RunResult, run
 from ..intents.extract_audio import (
@@ -1117,12 +1118,11 @@ def _execute(events, output_dir) -> None:
         if len(files) > 10:
             print(f"   … et {len(files) - 10} autres fichiers")
     else:
-        print("❌  Échec du téléchargement.")
         errors = result.errors if result else []
-        for e in errors[:3]:
-            print("   " + e)
+        friendly = humanize_error(errors + logs[-15:])
+        print("❌  " + (friendly or "Le téléchargement a échoué."))
         if questionary.confirm("Voir les détails techniques ?", default=False).ask():
-            for line in logs[-25:]:
+            for line in (errors + logs[-25:]):
                 print("   " + line)
 
 

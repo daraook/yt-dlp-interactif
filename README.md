@@ -1,5 +1,9 @@
 # yt-dlp interactif
 
+[![CI](https://github.com/daraook/yt-dlp-interactif/actions/workflows/ci.yml/badge.svg)](https://github.com/daraook/yt-dlp-interactif/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-%E2%89%A53.11-blue)
+
 **Rendre `yt-dlp` utilisable par tout le monde.**
 
 `yt-dlp` est un téléchargeur vidéo/audio extrêmement puissant — mais avec ~255 options
@@ -208,6 +212,15 @@ Toute idée d'amélioration ou d'ajout est aussi la bienvenue — propose-la en 
 - Interface TUI riche (Textual) en alternative à l'actuelle, sur le même noyau.
 - Recherche multi-sites (au-delà de YouTube).
 - Généralisation de l'approche à d'autres outils en ligne de commande.
+
+## Usage responsable
+
+Cet outil ne fait que piloter yt-dlp — c'est à toi de l'utiliser dans le respect de la loi.
+Les conditions d'utilisation de certaines plateformes (dont YouTube) limitent ou interdisent
+le téléchargement, et la plupart des contenus sont protégés par le **droit d'auteur**.
+Ne télécharge que ce que tu as le droit de récupérer — ton propre contenu, des œuvres libres
+de droits, ou avec l'autorisation de l'ayant droit — et réserve les fichiers à un usage
+personnel. Tu restes seul responsable de ton utilisation.
 
 ## Licence
 
