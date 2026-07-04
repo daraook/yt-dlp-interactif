@@ -107,6 +107,53 @@ def build_playlist_command(
     return cmd
 
 
+def build_batch_command(
+    output_dir: str | Path,
+    *,
+    urls: list[str] | None = None,
+    batch_file: str | Path | None = None,
+    media: str = "video",  # "video" | "audio"
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Commande pour télécharger plusieurs liens d'un coup.
+
+    Source : `urls` (liens en positionnel) OU `batch_file` (fichier .txt, un lien
+    par ligne). Chaque lien est traité comme une vidéo seule (--no-playlist).
+    """
+    if not urls and not batch_file:
+        raise ValueError("Fournir au moins `urls` ou `batch_file`.")
+
+    cmd: list[str] = [yt_dlp]
+    if media == "audio":
+        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
+        if audio_format not in _SANS_POCHETTE:
+            cmd.append("--embed-thumbnail")
+    else:
+        cmd += ["-f", _video_format_selector(max_height)]
+        if prefer_compatible:
+            cmd += ["-S", "vcodec:h264,acodec:aac"]
+        cmd += ["--merge-output-format", merge_format]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+
+    cmd.append("--no-playlist")
+    if batch_file:
+        cmd += ["--batch-file", str(batch_file)]
+
+    template = str(Path(output_dir) / "%(title)s.%(ext)s")
+    cmd += ["-o", template]
+    if urls:
+        cmd += list(urls)
+    return cmd
+
+
 def build_subtitles_command(
     url: str,
     output_dir: str | Path,

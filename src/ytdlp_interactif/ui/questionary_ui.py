@@ -32,6 +32,7 @@ from ..intents.subtitles import (
     plan_subtitles,
     run_subtitles,
 )
+from ..intents.batch import BatchChoices, plan_batch, run_batch
 from ..core.probe import approx_size_for_height, probe_formats, video_heights
 from .explain import explain_command
 
@@ -95,9 +96,10 @@ def run_app() -> None:
             "🎬  Télécharger une vidéo",
             "🎚️  Choisir la qualité (voir les formats réels)",
             "📃  Télécharger une playlist / chaîne",
+            "🗂️  Fichier de liens (lot)",
             "💬  Sous-titres",
             "🎵  Extraire l'audio (MP3, …)",
-            questionary.Choice("📥  Autres intentions", disabled="bientôt disponible"),
+            questionary.Choice("➕  Autres intentions", disabled="bientôt disponible"),
             "🚪  Quitter",
         ],
     ).ask()
@@ -112,6 +114,8 @@ def run_app() -> None:
         _flow_choose_quality()
     elif action.startswith("📃"):
         _flow_download_playlist()
+    elif action.startswith("🗂️"):
+        _flow_batch()
     elif action.startswith("💬"):
         _flow_subtitles()
     else:
@@ -248,6 +252,70 @@ def _flow_choose_quality() -> None:
     )
     print(f"\n  Qualité : {height}p (compatible H.264/AAC)  ·  Dossier : {plan.output_dir}")
     _confirm_and_run(plan, run_download_video)
+
+
+def _flow_batch() -> None:
+    source = questionary.select(
+        "Source des liens :",
+        choices=[
+            "📋  Coller les liens un par un",
+            "📄  Charger un fichier .txt (un lien par ligne)",
+        ],
+    ).ask()
+    if _cancelled(source):
+        return
+
+    urls: list[str] | None = None
+    batch_file: str | None = None
+
+    if source.startswith("📋"):
+        urls = []
+        while True:
+            u = questionary.text(f"Lien #{len(urls) + 1} (vide pour terminer) :").ask()
+            if _cancelled(u):
+                return
+            u = u.strip()
+            if not u:
+                if urls:
+                    break
+                print("  Ajoute au moins un lien.")
+                continue
+            urls.append(u)
+    else:
+        chosen = questionary.path(
+            "Fichier de liens :", file_filter=_hide_hidden
+        ).ask()
+        if _cancelled(chosen) or not chosen.strip():
+            return
+        batch_file = chosen.strip()
+
+    media_sel = questionary.select(
+        "Type de contenu :", choices=["🎬  Vidéos", "🎵  Audios (MP3)"]
+    ).ask()
+    if _cancelled(media_sel):
+        return
+    media = "audio" if media_sel.startswith("🎵") else "video"
+
+    max_height = None
+    if media == "video":
+        res_label = questionary.select(
+            "Qualité (résolution) :", choices=list(_RESOLUTIONS),
+            default="Meilleure disponible",
+        ).ask()
+        if _cancelled(res_label):
+            return
+        max_height = _RESOLUTIONS[res_label]
+
+    plan = plan_batch(
+        BatchChoices(urls=urls, batch_file=batch_file, media=media, max_height=max_height)
+    )
+
+    combien = f"{len(urls)} lien(s)" if urls else f"fichier {batch_file}"
+    print("\n── Récapitulatif ──")
+    print(f"  Source  : {combien}  ·  Contenu : {'audios MP3' if media == 'audio' else 'vidéos'}")
+    print(f"  Dossier : {plan.output_dir}")
+
+    _confirm_and_run(plan, run_batch)
 
 
 def _flow_subtitles() -> None:

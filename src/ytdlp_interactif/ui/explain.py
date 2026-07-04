@@ -20,6 +20,7 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--yes-playlist": (False, "Traiter toute la playlist du lien."),
     "--playlist-items": (True, "Ne prendre que certains éléments (ex. 1-10, 1,3,5, 5:)."),
     "--download-archive": (True, "Journal des vidéos déjà prises : évite de les re-télécharger."),
+    "--batch-file": (True, "Lire les liens à télécharger depuis un fichier texte."),
     "--skip-download": (False, "Ne pas télécharger la vidéo (récupérer seulement les annexes)."),
     "--write-subs": (False, "Récupérer les sous-titres (fichiers séparés)."),
     "--write-auto-subs": (False, "Inclure aussi les sous-titres auto-générés."),
