@@ -74,7 +74,7 @@ spécifique à YouTube.
 
 ## Installation
 
-**1. Installer les dépendances requises** (yt-dlp et ffmpeg) :
+**Étape commune — installer yt-dlp et ffmpeg** (requis, quelle que soit l'option) :
 
 | Système | Commande |
 |--------|----------|
@@ -82,10 +82,43 @@ spécifique à YouTube.
 | macOS (Homebrew) | `brew install yt-dlp ffmpeg` |
 | Windows (winget) | `winget install yt-dlp.yt-dlp ffmpeg` |
 
-> Si `yt-dlp` de ta distribution est ancien : `pip install -U yt-dlp` (ou l'option
+> Si le `yt-dlp` de ta distribution est ancien : `pip install -U yt-dlp` (ou l'option
 > « Mettre à jour yt-dlp » dans l'outil).
 
-**2. Installer l'outil :**
+Ensuite, choisis **une** des deux options ci-dessous.
+
+### Option A — Simple (recommandée) · via pipx
+
+`pipx` installe l'outil de façon isolée et le rend disponible partout, sur
+**Linux, macOS et Windows**. Il gère l'environnement pour toi.
+
+**1. Installer pipx** (une seule fois) :
+
+| Système | Commande |
+|--------|----------|
+| Debian / Ubuntu / Kali | `sudo apt install pipx` |
+| macOS (Homebrew) | `brew install pipx` |
+| Windows | `py -m pip install --user pipx` puis `py -m pipx ensurepath` |
+
+**2. Installer l'outil — une commande :**
+
+```bash
+pipx install git+https://github.com/daraook/yt-dlp-interactif.git
+```
+
+**3. Lancer — une commande (depuis n'importe où) :**
+
+```bash
+ytdlp-interactif
+```
+
+> Pour mettre à jour plus tard : `pipx upgrade ytdlp-interactif`.
+> Pour désinstaller : `pipx uninstall ytdlp-interactif`.
+
+### Option B — Manuelle · via un environnement virtuel
+
+Pour celles et ceux qui préfèrent tout maîtriser, ou pour **développer** (voir aussi
+[`CONTRIBUTING.md`](CONTRIBUTING.md)) :
 
 ```bash
 git clone https://github.com/daraook/yt-dlp-interactif.git
@@ -94,15 +127,14 @@ python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-> Le venv est recommandé (obligatoire sur les distributions « externally managed »
-> comme Debian/Ubuntu/Kali). yt-dlp et ffmpeg, eux, restent installés au niveau système.
+Lancement : `.venv/bin/ytdlp-interactif`
 
 ## Utilisation
 
-```bash
-.venv/bin/ytdlp-interactif
-# ou : .venv/bin/python -m ytdlp_interactif
-```
+Lance la commande selon ton installation :
+
+- Installé avec **pipx** (Option A) : `ytdlp-interactif`
+- Installé avec **venv** (Option B) : `.venv/bin/ytdlp-interactif`
 
 Navigue avec ↑↓, valide avec Entrée. Les fichiers atterrissent dans
 `~/Téléchargements/yt-dlp-interactif/` (dossier Téléchargements détecté selon l'OS —
