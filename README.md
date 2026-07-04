@@ -41,7 +41,12 @@ python3 -m venv .venv
 
 **Outils** — 🔍 Inspecter (infos sans télécharger) · ⬆️ Mettre à jour yt-dlp.
 
-Chaque écran offre un toggle **« voir la commande »** : la commande yt-dlp exécutée est
+**Sur mesure** — 🧩 **Personnalisé** : empile n'importe quelle combinaison d'options en un
+seul téléchargement (ex. *playlist entière + audio seul + retirer les sponsors +
+sous-titres FR*, ou *extrait 1:30-2:45 + cookies navigateur + débit bridé*).
+
+Chaque option du menu affiche une **description** de ce qu'elle fait. Chaque écran offre
+un toggle **« voir la commande »** : la commande yt-dlp exécutée est
 affichée et **chaque option expliquée** (apprentissage actif, masqué par défaut).
 
 ## Où atterrissent les fichiers

@@ -86,6 +86,84 @@ def _finish(cmd: list[str], output_dir: str | Path, url: str) -> list[str]:
     return cmd
 
 
+def build_custom_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    media: str = "video",
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    playlist: bool = False,
+    playlist_items: str | None = None,
+    section: tuple[str, str] | None = None,
+    sponsorblock_categories: str | None = None,
+    sub_langs: str | None = None,
+    embed_subs: bool = False,
+    cookies_browser: str | None = None,
+    limit_rate: str | None = None,
+    concurrent: int = 4,
+    embed_thumbnail: bool = True,
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Constructeur « superset » : empile n'importe quelle combinaison d'options.
+
+    C'est le moteur composable derrière l'intention « Personnalisé » : média,
+    playlist, extrait, SponsorBlock, sous-titres, cookies, réseau… en un seul
+    passage. Ordre déterministe pour rester testable.
+    """
+    cmd: list[str] = [yt_dlp]
+    _media_prefix(
+        cmd, media=media, max_height=max_height,
+        prefer_compatible=prefer_compatible, merge_format=merge_format,
+        audio_format=audio_format, audio_quality=audio_quality,
+        embed_thumbnail_audio=embed_thumbnail,
+    )
+    if media != "audio" and embed_thumbnail:
+        cmd.append("--embed-thumbnail")
+
+    if sub_langs:
+        cmd += ["--write-subs", "--write-auto-subs", "--sub-langs", sub_langs,
+                "--convert-subs", "srt"]
+        if embed_subs and media != "audio":
+            cmd.append("--embed-subs")
+
+    if sponsorblock_categories:
+        cmd += ["--sponsorblock-remove", sponsorblock_categories]
+
+    if section:
+        cmd += ["--download-sections", f"*{section[0]}-{section[1]}"]
+        if media != "audio":
+            cmd.append("--force-keyframes-at-cuts")
+
+    if cookies_browser:
+        cmd += ["--cookies-from-browser", cookies_browser]
+    if limit_rate:
+        cmd += ["-r", limit_rate]
+    if concurrent and concurrent > 1:
+        cmd += ["-N", str(concurrent)]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+
+    if playlist:
+        cmd.append("--yes-playlist")
+        if playlist_items:
+            cmd += ["--playlist-items", playlist_items]
+        template = str(
+            Path(output_dir) / "%(playlist_title)s"
+            / "%(playlist_index)02d - %(title)s.%(ext)s"
+        )
+    else:
+        cmd.append("--no-playlist")
+        template = str(Path(output_dir) / "%(title)s.%(ext)s")
+
+    cmd += ["-o", template, url]
+    return cmd
+
+
 def build_convert_command(
     url: str,
     output_dir: str | Path,

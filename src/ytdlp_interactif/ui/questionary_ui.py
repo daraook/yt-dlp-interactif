@@ -44,6 +44,7 @@ from ..intents.extras import ExtrasChoices, plan_extras, run_extras
 from ..intents.live import LiveChoices, plan_live, run_live
 from ..intents.unlock import UnlockChoices, plan_unlock, run_unlock
 from ..intents.network import NetworkChoices, plan_network, run_network
+from ..intents.custom import CustomChoices, plan_custom, run_custom
 
 # Débit -> valeur yt-dlp (None = illimité).
 _RATES = {
@@ -160,10 +161,14 @@ def run_app() -> None:
          "Affiche titre, durée, qualités et sous-titres disponibles. Ne télécharge rien."),
         ("⬆️  Mettre à jour yt-dlp", _flow_update,
          "Vérifie et installe la dernière version de yt-dlp."),
+        ("🧩  Personnalisé (tout combiner)", _flow_custom,
+         "Empile les options à la carte : audio+playlist, sponsors+extrait+sous-titres, cookies, réseau…"),
     ]
     handlers = {label: fn for label, fn, _ in menu}
     C = lambda i: questionary.Choice(menu[i][0], description=menu[i][2])
     choices = [
+        questionary.Separator("── Sur mesure ──"),
+        C(15),
         questionary.Separator("── Télécharger ──"),
         *[C(i) for i in range(0, 5)],
         questionary.Separator("── Transformer ──"),
@@ -871,6 +876,120 @@ def _flow_update() -> None:
     else:
         print("⚠️  Si yt-dlp a été installé via pip, mets-le à jour ainsi :")
         print("     pip install -U yt-dlp   (ou : .venv/bin/pip install -U yt-dlp)")
+
+
+def _ask_sub_langs():
+    """(ok, langs) — sélection de langue de sous-titres avec option personnalisée."""
+    label = questionary.select("Langue(s) :", choices=list(_SUB_LANGS),
+                               default="Français + Anglais").ask()
+    if _cancelled(label):
+        return False, None
+    langs = _SUB_LANGS[label]
+    if langs is None:
+        langs = questionary.text("Codes (ex. fr,en,es) :",
+                                 validate=lambda v: bool(v.strip()) or "Au moins une langue.").ask()
+        if _cancelled(langs):
+            return False, None
+        langs = langs.strip()
+    return True, langs
+
+
+def _flow_custom() -> None:
+    """Empile n'importe quelle combinaison d'options en un seul téléchargement."""
+    url = _ask_url()
+    if url is None:
+        return
+    ok, media = _ask_media()
+    if not ok:
+        return
+
+    max_height = None
+    if media == "video":
+        ok, max_height = _ask_resolution()
+        if not ok:
+            return
+
+    resume: list[str] = ["audio MP3" if media == "audio" else "vidéo"]
+    kw: dict = {"url": url, "media": media, "max_height": max_height}
+
+    # Playlist entière ?
+    if questionary.confirm("Si c'est une playlist/chaîne, tout prendre ?",
+                           default=False).ask():
+        kw["playlist"] = True
+        resume.append("playlist entière")
+        if questionary.confirm("Limiter à une plage d'éléments ?", default=False).ask():
+            items = questionary.text("Éléments (ex. 1-10) :",
+                                     validate=lambda v: bool(v.strip()) or "…").ask()
+            if _cancelled(items):
+                return
+            kw["playlist_items"] = items.strip()
+            resume[-1] = f"playlist {items.strip()}"
+
+    # Extrait temporel ?
+    if questionary.confirm("Ne prendre qu'un extrait temporel ?", default=False).ask():
+        s = questionary.text("Début (ex. 1:30) :", validate=lambda v: bool(v.strip()) or "…").ask()
+        if _cancelled(s):
+            return
+        e = questionary.text("Fin (ex. 2:45) :", validate=lambda v: bool(v.strip()) or "…").ask()
+        if _cancelled(e):
+            return
+        kw["section"] = (s.strip(), e.strip())
+        resume.append(f"extrait {s.strip()}-{e.strip()}")
+
+    # SponsorBlock ?
+    if questionary.confirm("Retirer les segments SponsorBlock (sponsors, intros…) ?",
+                           default=False).ask():
+        cats = questionary.checkbox(
+            "Catégories :",
+            choices=[questionary.Choice(l, checked=(c == "sponsor"))
+                     for l, c in _SB_CATEGORIES.items()],
+        ).ask()
+        if _cancelled(cats):
+            return
+        codes = [_SB_CATEGORIES[l] for l in cats] if cats else ["sponsor"]
+        kw["sponsorblock_categories"] = ",".join(codes)
+        resume.append("sans sponsors")
+
+    # Sous-titres ?
+    if questionary.confirm("Ajouter des sous-titres ?", default=False).ask():
+        ok, langs = _ask_sub_langs()
+        if not ok:
+            return
+        kw["sub_langs"] = langs
+        resume.append(f"sous-titres {langs}")
+        if media == "video" and questionary.confirm("Les incruster dans la vidéo ?",
+                                                    default=False).ask():
+            kw["embed_subs"] = True
+
+    # Cookies (contenu privé) ?
+    if questionary.confirm("Utiliser les cookies d'un navigateur (privé/membre) ?",
+                           default=False).ask():
+        browser = questionary.select("Navigateur :", choices=_BROWSERS,
+                                     default="firefox").ask()
+        if _cancelled(browser):
+            return
+        kw["cookies_browser"] = browser
+        resume.append(f"cookies {browser}")
+
+    # Réseau ?
+    if questionary.confirm("Régler le débit / le parallélisme ?", default=False).ask():
+        rate_label = questionary.select("Limite de débit :", choices=list(_RATES),
+                                        default="Illimité").ask()
+        if _cancelled(rate_label):
+            return
+        kw["limit_rate"] = _RATES[rate_label]
+        conc = questionary.select("Parallèle :", choices=["1", "4", "8", "16"],
+                                  default="4").ask()
+        if _cancelled(conc):
+            return
+        kw["concurrent"] = int(conc)
+        resume.append(f"réseau {rate_label}/{conc}x")
+
+    plan = plan_custom(CustomChoices(**kw))
+    print("\n── Récapitulatif (combo) ──")
+    print("  " + "  ·  ".join(resume))
+    print(f"  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_custom)
 
 
 def _confirm_and_run(plan, run_fn) -> None:
