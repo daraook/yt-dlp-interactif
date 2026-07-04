@@ -5,15 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ytdlp-interactif"
 version = "0.1.0"
-description = "Interface interactive rendant yt-dlp accessible à tous"
+description = "Interface interactive qui rend yt-dlp accessible à tous"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Daraook" }]
+keywords = ["yt-dlp", "youtube", "downloader", "cli", "interactive", "tui"]
 dependencies = ["questionary>=2.1"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.urls]
+Repository = "https://github.com/Daraook/yt-dlp-interactif"
 
 [project.scripts]
 ytdlp-interactif = "ytdlp_interactif.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 100

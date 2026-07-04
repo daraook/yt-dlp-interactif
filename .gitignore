@@ -1,7 +1,16 @@
+# Environnement virtuel
 .venv/
+
+# Caches Python
 __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+.ruff_cache/
+
+# Build
 build/
 dist/
+
+# Fichier de travail interne (non publié)
+CLAUDE.md
