@@ -39,7 +39,8 @@ python3 -m venv .venv
 **Cas particuliers** — 🔓 Débloquer (cookies navigateur / géo / âge) · 📺 Live / première ·
 ⚡ Vitesse / réseau.
 
-**Outils** — 🔍 Inspecter (infos sans télécharger) · ⬆️ Mettre à jour yt-dlp.
+**Outils** — 🔎 Chercher (par mots-clés : liste vidéos ET playlists, puis télécharge) ·
+🔍 Inspecter (infos sans télécharger) · ⬆️ Mettre à jour yt-dlp.
 
 **Sur mesure** — 🧩 **Personnalisé** : empile n'importe quelle combinaison d'options en un
 seul téléchargement (ex. *playlist entière + audio seul + retirer les sponsors +

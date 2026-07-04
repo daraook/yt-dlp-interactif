@@ -45,6 +45,7 @@ from ..intents.live import LiveChoices, plan_live, run_live
 from ..intents.unlock import UnlockChoices, plan_unlock, run_unlock
 from ..intents.network import NetworkChoices, plan_network, run_network
 from ..intents.custom import CustomChoices, plan_custom, run_custom
+from ..core.search import search
 
 # Débit -> valeur yt-dlp (None = illimité).
 _RATES = {
@@ -163,12 +164,14 @@ def run_app() -> None:
          "Vérifie et installe la dernière version de yt-dlp."),
         ("🧩  Personnalisé (tout combiner)", _flow_custom,
          "Empile les options à la carte : audio+playlist, sponsors+extrait+sous-titres, cookies, réseau…"),
+        ("🔎  Chercher (vidéos & playlists)", _flow_search,
+         "Cherche par mots-clés, liste vidéos ET playlists trouvées, puis télécharge ton choix."),
     ]
     handlers = {label: fn for label, fn, _ in menu}
     C = lambda i: questionary.Choice(menu[i][0], description=menu[i][2])
     choices = [
         questionary.Separator("── Sur mesure ──"),
-        C(15),
+        C(15), C(16),
         questionary.Separator("── Télécharger ──"),
         *[C(i) for i in range(0, 5)],
         questionary.Separator("── Transformer ──"),
@@ -892,6 +895,73 @@ def _ask_sub_langs():
             return False, None
         langs = langs.strip()
     return True, langs
+
+
+def _flow_search() -> None:
+    query = questionary.text(
+        "Rechercher (mots-clés) :",
+        validate=lambda v: True if v.strip() else "Tape quelque chose à chercher.",
+    ).ask()
+    if _cancelled(query):
+        return
+
+    print("\n🔎  Recherche en cours…")
+    try:
+        results = search(query.strip())
+    except Exception:
+        print("❌  Recherche impossible (voir le message ci-dessus).")
+        return
+    if not results:
+        print("Aucun résultat.")
+        return
+
+    icons = {"playlist": "📃", "video": "🎬", "channel": "📺"}
+    order = {"playlist": 0, "video": 1, "channel": 2}
+    ordered = sorted(results, key=lambda r: order.get(r.kind, 3))
+    choices = [
+        questionary.Choice(f"{icons[r.kind]}  {r.title[:70]}",
+                           description=r.subtitle, value=i)
+        for i, r in enumerate(ordered)
+    ]
+    choices.append(questionary.Choice("↩  Annuler", value=-1))
+
+    sel = questionary.select(
+        f"{len(ordered)} résultats (playlists en tête) :",
+        choices=choices, show_description=True,
+    ).ask()
+    if _cancelled(sel) or sel == -1:
+        return
+    r = ordered[sel]
+
+    if r.kind in ("playlist", "channel"):
+        ok, media = _ask_media()
+        if not ok:
+            return
+        max_height = None
+        if media == "video":
+            ok, max_height = _ask_resolution()
+            if not ok:
+                return
+        plan = plan_download_playlist(
+            PlaylistChoices(url=r.url, media=media, max_height=max_height))
+        print(f"\n  {r.title}  ·  {'audios MP3' if media == 'audio' else 'vidéos'}")
+        print(f"  Dossier : {plan.output_dir}")
+        _confirm_and_run(plan, run_download_playlist)
+    else:  # vidéo
+        ok, media = _ask_media()
+        if not ok:
+            return
+        if media == "audio":
+            plan = plan_extract_audio(AudioChoices(url=r.url))
+            print(f"\n  {r.title}  ·  Dossier : {plan.output_dir}")
+            _confirm_and_run(plan, run_extract_audio)
+        else:
+            ok, max_height = _ask_resolution()
+            if not ok:
+                return
+            plan = plan_download_video(VideoChoices(url=r.url, max_height=max_height))
+            print(f"\n  {r.title}  ·  Dossier : {plan.output_dir}")
+            _confirm_and_run(plan, run_download_video)
 
 
 def _flow_custom() -> None:
