@@ -17,7 +17,8 @@ dependencies = ["questionary>=2.1"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.urls]
-Repository = "https://github.com/Daraook/yt-dlp-interactif"
+Repository = "https://github.com/daraook/yt-dlp-interactif"
+Issues = "https://github.com/daraook/yt-dlp-interactif/issues"
 
 [project.scripts]
 ytdlp-interactif = "ytdlp_interactif.__main__:main"

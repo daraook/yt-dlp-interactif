@@ -74,15 +74,28 @@ spécifique à YouTube.
 
 ## Installation
 
+**1. Installer les dépendances requises** (yt-dlp et ffmpeg) :
+
+| Système | Commande |
+|--------|----------|
+| Debian / Ubuntu / Kali | `sudo apt install yt-dlp ffmpeg` |
+| macOS (Homebrew) | `brew install yt-dlp ffmpeg` |
+| Windows (winget) | `winget install yt-dlp.yt-dlp ffmpeg` |
+
+> Si `yt-dlp` de ta distribution est ancien : `pip install -U yt-dlp` (ou l'option
+> « Mettre à jour yt-dlp » dans l'outil).
+
+**2. Installer l'outil :**
+
 ```bash
-git clone <url-du-depot> yt-dlp-interactif
+git clone https://github.com/daraook/yt-dlp-interactif.git
 cd yt-dlp-interactif
 python3 -m venv .venv
 .venv/bin/pip install -e .
 ```
 
-> Sur les distributions « externally managed » (Debian/Ubuntu/Kali), le venv est la voie
-> recommandée. yt-dlp et ffmpeg restent installés séparément (paquet système, `pip`, `brew`…).
+> Le venv est recommandé (obligatoire sur les distributions « externally managed »
+> comme Debian/Ubuntu/Kali). yt-dlp et ffmpeg, eux, restent installés au niveau système.
 
 ## Utilisation
 
@@ -155,6 +168,20 @@ est décrite dans [`docs/GUIDE-METHODOLOGIE.md`](docs/GUIDE-METHODOLOGIE.md).
   cartographie complète de yt-dlp (17 groupes, 255 options) et couche « intentions ».
 - [`docs/spec-extraire-audio.md`](docs/spec-extraire-audio.md) — exemple de spécification
   comportementale (première intention).
+
+## Signaler un problème & contribuer
+
+**Utilisateurs** — si quelque chose ne fonctionne pas comme prévu (un site qui échoue,
+un message peu clair, un comportement inattendu), n'hésite pas à **ouvrir un ticket** dans
+l'onglet [Issues](https://github.com/daraook/yt-dlp-interactif/issues). Décris ce que tu
+faisais, ce que tu attendais et ce qui s'est passé — même un rapport court aide.
+
+**Développeurs** — les contributions sont les bienvenues : nouvelle intention, prise en
+charge d'un cas, correction, amélioration de l'interface ou de la doc. Ouvre une *issue*
+pour en discuter, puis une *pull request*. La marche à suivre (installation dev, tests,
+ajout d'une intention) est détaillée dans [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+Toute idée d'amélioration ou d'ajout est aussi la bienvenue — propose-la en *issue*.
 
 ## Feuille de route
 
