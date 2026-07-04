@@ -5,8 +5,13 @@ l'outil se présente, propose les options, guide le choix, demande les inputs au
 et exécute à la place de l'utilisateur. yt-dlp = 1er cas d'un concept réutilisable
 (« rendre n'importe quel CLI interactif »), mais **la v1 reste 100 % dédiée yt-dlp**.
 
+# État (2026-07-04)
+- **15 intentions livrées** couvrant les 18 de la cartographie §5 (géo fusionné dans « Débloquer », presets couverts par les modes « Rapide », nommage/dossier = option par flow). 85 tests verts. 9 commits.
+- Menu groupé (Télécharger / Transformer / Cas particuliers / Outils). README.md à jour.
+- Reste possible plus tard : 2e interface Textual, généralisation multi-CLI, installer Deno assisté.
+
 # Décisions de cadrage (2026-07-03)
-- **Q1 Interface** : construire DEUX pistes — TUI Textual **et** prompts questionary — comparer au rendu, trancher ensuite.
+- **Q1 Interface** : questionary retenu (Textual gardé en perspective future).
 - **Q2 Portée** : 100 % dédié yt-dlp pour la v1. Généralisation (archi réutilisable / moteur générique piloté par config) = exploration ultérieure, non bannie.
 - **Q3 Pédagogie** : commande yt-dlp générée **masquée par défaut**, dévoilable à la demande, avec explications tirées de la doc officielle → apprentissage actif.
 - **Q4 Départ** : cartographie de l'outil AVANT tout code. ✅ Fait.
