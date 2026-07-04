@@ -11,3 +11,7 @@ __pycache__/
 # Build
 build/
 dist/
+
+# Couverture de test
+.coverage
+htmlcov/
