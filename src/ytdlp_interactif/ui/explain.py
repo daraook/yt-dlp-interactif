@@ -23,6 +23,8 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--batch-file": (True, "Lire les liens à télécharger depuis un fichier texte."),
     "--sponsorblock-remove": (True, "Couper les segments SponsorBlock choisis (sponsors, intros…)."),
     "--sponsorblock-mark": (True, "Marquer les segments SponsorBlock en chapitres (sans couper)."),
+    "--download-sections": (True, "Ne télécharger qu'un extrait temporel (ex. *1:30-2:45)."),
+    "--force-keyframes-at-cuts": (False, "Recouper précisément aux temps demandés (réencodage léger)."),
     "--skip-download": (False, "Ne pas télécharger la vidéo (récupérer seulement les annexes)."),
     "--write-subs": (False, "Récupérer les sous-titres (fichiers séparés)."),
     "--write-auto-subs": (False, "Inclure aussi les sous-titres auto-générés."),

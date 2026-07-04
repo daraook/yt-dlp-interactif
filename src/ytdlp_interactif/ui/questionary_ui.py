@@ -38,6 +38,7 @@ from ..intents.sponsorblock import (
     plan_sponsorblock,
     run_sponsorblock,
 )
+from ..intents.sections import SectionChoices, plan_section, run_section
 
 # Libellé -> code de catégorie SponsorBlock.
 _SB_CATEGORIES = {
@@ -115,6 +116,7 @@ def run_app() -> None:
             "📃  Télécharger une playlist / chaîne",
             "🗂️  Fichier de liens (lot)",
             "🚫  SponsorBlock (retirer sponsors/intros…)",
+            "✂️  Découper un extrait (HH:MM-HH:MM)",
             "💬  Sous-titres",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("➕  Autres intentions", disabled="bientôt disponible"),
@@ -136,6 +138,8 @@ def run_app() -> None:
         _flow_batch()
     elif action.startswith("🚫"):
         _flow_sponsorblock()
+    elif action.startswith("✂️"):
+        _flow_section()
     elif action.startswith("💬"):
         _flow_subtitles()
     else:
@@ -336,6 +340,54 @@ def _flow_batch() -> None:
     print(f"  Dossier : {plan.output_dir}")
 
     _confirm_and_run(plan, run_batch)
+
+
+def _flow_section() -> None:
+    url = questionary.text(
+        "URL de la vidéo :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    _t = lambda v: True if v.strip() else "Indique un temps (ex. 1:30, 0:01:30 ou 90)."
+    start = questionary.text("Début (ex. 1:30) :", validate=_t).ask()
+    if _cancelled(start):
+        return
+    end = questionary.text("Fin (ex. 2:45) :", validate=_t).ask()
+    if _cancelled(end):
+        return
+
+    media_sel = questionary.select(
+        "Extrait en :", choices=["🎬  Vidéo", "🎵  Audio (MP3)"]
+    ).ask()
+    if _cancelled(media_sel):
+        return
+    media = "audio" if media_sel.startswith("🎵") else "video"
+
+    max_height = None
+    if media == "video":
+        res_label = questionary.select(
+            "Qualité (résolution) :", choices=list(_RESOLUTIONS),
+            default="Meilleure disponible",
+        ).ask()
+        if _cancelled(res_label):
+            return
+        max_height = _RESOLUTIONS[res_label]
+
+    choices = SectionChoices(
+        url=url, start=start.strip(), end=end.strip(),
+        media=media, max_height=max_height,
+    )
+    plan = plan_section(choices)
+
+    print("\n── Récapitulatif ──")
+    print(f"  Extrait : {start.strip()} → {end.strip()}  ·  "
+          f"{'audio MP3' if media == 'audio' else 'vidéo'}")
+    print(f"  Dossier : {plan.output_dir}")
+
+    _confirm_and_run(plan, run_section)
 
 
 def _flow_sponsorblock() -> None:

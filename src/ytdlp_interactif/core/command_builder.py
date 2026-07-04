@@ -107,6 +107,50 @@ def build_playlist_command(
     return cmd
 
 
+def build_section_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    start: str,
+    end: str,
+    media: str = "video",  # "video" | "audio"
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Télécharge seulement un extrait temporel [start-end].
+
+    `start`/`end` acceptent les formats yt-dlp : secondes (90) ou horodatage
+    (1:30, 0:01:30). En vidéo, --force-keyframes-at-cuts assure une coupe précise.
+    """
+    cmd: list[str] = [yt_dlp]
+    if media == "audio":
+        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
+        if audio_format not in _SANS_POCHETTE:
+            cmd.append("--embed-thumbnail")
+    else:
+        cmd += ["-f", _video_format_selector(max_height)]
+        if prefer_compatible:
+            cmd += ["-S", "vcodec:h264,acodec:aac"]
+        cmd += ["--merge-output-format", merge_format]
+
+    cmd += ["--download-sections", f"*{start}-{end}"]
+    if media != "audio":
+        cmd.append("--force-keyframes-at-cuts")
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+
+    cmd.append("--no-playlist")
+    template = str(Path(output_dir) / "%(title)s.%(ext)s")
+    cmd += ["-o", template, url]
+    return cmd
+
+
 def build_sponsorblock_command(
     url: str,
     output_dir: str | Path,
