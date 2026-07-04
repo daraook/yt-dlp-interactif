@@ -11,6 +11,3 @@ __pycache__/
 # Build
 build/
 dist/
-
-# Fichier de travail interne (non publié)
-CLAUDE.md
