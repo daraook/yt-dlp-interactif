@@ -89,6 +89,38 @@ def approx_size_for_height(formats: list[FormatInfo], height: int) -> int | None
     return vsize + audio if audio else None
 
 
+@dataclass(frozen=True)
+class InfoSummary:
+    title: str
+    uploader: str
+    duration: int | None
+    is_live: bool
+    formats: list[FormatInfo]
+    sub_langs: list[str]
+    auto_sub_langs: list[str]
+
+    @property
+    def heights(self) -> list[int]:
+        return video_heights(self.formats)
+
+
+def parse_info(info: dict) -> InfoSummary:
+    """Résumé lisible depuis le JSON `-J` (titre, durée, formats, sous-titres)."""
+    return InfoSummary(
+        title=info.get("title", ""),
+        uploader=info.get("uploader") or info.get("channel", ""),
+        duration=info.get("duration"),
+        is_live=bool(info.get("is_live")),
+        formats=parse_formats(info),
+        sub_langs=sorted((info.get("subtitles") or {}).keys()),
+        auto_sub_langs=sorted((info.get("automatic_captions") or {}).keys()),
+    )
+
+
+def _default_check_output(cmd: list[str]) -> str:
+    return subprocess.check_output(cmd, text=True)
+
+
 def probe_formats(
     url: str,
     *,
@@ -96,10 +128,18 @@ def probe_formats(
     check_output: Callable[[list[str]], str] | None = None,
 ) -> list[FormatInfo]:
     """Lance `yt-dlp -J` sur l'URL et renvoie les formats analysés."""
-    if check_output is None:
-        def check_output(cmd: list[str]) -> str:  # noqa: E306
-            return subprocess.check_output(cmd, text=True)
-
+    check_output = check_output or _default_check_output
     cmd = [yt_dlp, "-J", "--no-warnings", "--no-playlist", url]
-    raw = check_output(cmd)
-    return parse_formats(json.loads(raw))
+    return parse_formats(json.loads(check_output(cmd)))
+
+
+def probe_info(
+    url: str,
+    *,
+    yt_dlp: str = "yt-dlp",
+    check_output: Callable[[list[str]], str] | None = None,
+) -> InfoSummary:
+    """Lance `yt-dlp -J` et renvoie un résumé complet (pour « Inspecter »)."""
+    check_output = check_output or _default_check_output
+    cmd = [yt_dlp, "-J", "--no-warnings", "--no-playlist", url]
+    return parse_info(json.loads(check_output(cmd)))

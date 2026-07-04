@@ -56,6 +56,187 @@ def _video_format_selector(max_height: int | None) -> str:
     return "bestvideo+bestaudio/best"
 
 
+def _media_prefix(
+    cmd: list[str],
+    *,
+    media: str,
+    max_height: int | None,
+    prefer_compatible: bool,
+    merge_format: str,
+    audio_format: str,
+    audio_quality: str,
+    embed_thumbnail_audio: bool = True,
+) -> None:
+    """Ajoute à `cmd` la sélection vidéo (fusion) OU audio (extraction)."""
+    if media == "audio":
+        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
+        if embed_thumbnail_audio and audio_format not in _SANS_POCHETTE:
+            cmd.append("--embed-thumbnail")
+    else:
+        cmd += ["-f", _video_format_selector(max_height)]
+        if prefer_compatible:
+            cmd += ["-S", "vcodec:h264,acodec:aac"]
+        cmd += ["--merge-output-format", merge_format]
+
+
+def _finish(cmd: list[str], output_dir: str | Path, url: str) -> list[str]:
+    cmd.append("--no-playlist")
+    cmd += ["-o", str(Path(output_dir) / "%(title)s.%(ext)s"), url]
+    return cmd
+
+
+def build_convert_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    target_ext: str = "mp4",
+    recode: bool = False,
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Télécharge puis change de format. remux = conteneur seul (rapide, sans
+    perte) ; recode = réencodage (plus lent, change le codec)."""
+    cmd: list[str] = [yt_dlp, "-f", _video_format_selector(max_height)]
+    if prefer_compatible:
+        cmd += ["-S", "vcodec:h264,acodec:aac"]
+    cmd += ["--recode-video", target_ext] if recode else ["--remux-video", target_ext]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+    return _finish(cmd, output_dir, url)
+
+
+def build_extras_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    media: str = "video",
+    write_thumbnail: bool = False,
+    embed_thumbnail: bool = True,
+    write_info_json: bool = False,
+    embed_metadata: bool = True,
+    skip_download: bool = False,
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Gérer miniature et métadonnées : écrire/incruster la miniature, écrire le
+    JSON d'infos, incruster les tags. `skip_download` = récupérer les annexes seules."""
+    cmd: list[str] = [yt_dlp]
+    if skip_download:
+        cmd.append("--skip-download")
+    else:
+        _media_prefix(
+            cmd, media=media, max_height=max_height,
+            prefer_compatible=prefer_compatible, merge_format=merge_format,
+            audio_format=audio_format, audio_quality=audio_quality,
+            embed_thumbnail_audio=False,
+        )
+    if write_thumbnail:
+        cmd.append("--write-thumbnail")
+    if embed_thumbnail and not skip_download:
+        cmd.append("--embed-thumbnail")
+    if write_info_json:
+        cmd.append("--write-info-json")
+    if embed_metadata and not skip_download:
+        cmd.append("--embed-metadata")
+    return _finish(cmd, output_dir, url)
+
+
+def build_live_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    from_start: bool = True,
+    wait: bool = False,
+    wait_interval: str = "30",
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Télécharger un live/première : depuis le début, et/ou en attendant qu'il commence."""
+    cmd: list[str] = [yt_dlp, "-f", _video_format_selector(max_height)]
+    if prefer_compatible:
+        cmd += ["-S", "vcodec:h264,acodec:aac"]
+    cmd += ["--merge-output-format", merge_format]
+    if from_start:
+        cmd.append("--live-from-start")
+    if wait:
+        cmd += ["--wait-for-video", wait_interval]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+    return _finish(cmd, output_dir, url)
+
+
+def build_unlock_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    browser: str = "firefox",
+    geo_bypass: bool = False,
+    media: str = "video",
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Débloquer une vidéo privée/membre/âge en réutilisant les cookies du
+    navigateur, avec contournement géographique optionnel."""
+    cmd: list[str] = [yt_dlp]
+    _media_prefix(
+        cmd, media=media, max_height=max_height,
+        prefer_compatible=prefer_compatible, merge_format=merge_format,
+        audio_format=audio_format, audio_quality=audio_quality,
+    )
+    cmd += ["--cookies-from-browser", browser]
+    if geo_bypass:
+        cmd.append("--geo-bypass")
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+    return _finish(cmd, output_dir, url)
+
+
+def build_network_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    limit_rate: str | None = None,
+    concurrent: int = 4,
+    media: str = "video",
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    audio_format: str = "mp3",
+    audio_quality: str = "192K",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Télécharger avec réglages réseau : bride de débit (-r) et parallélisme (-N)."""
+    cmd: list[str] = [yt_dlp]
+    _media_prefix(
+        cmd, media=media, max_height=max_height,
+        prefer_compatible=prefer_compatible, merge_format=merge_format,
+        audio_format=audio_format, audio_quality=audio_quality,
+    )
+    if limit_rate:
+        cmd += ["-r", limit_rate]
+    if concurrent and concurrent > 1:
+        cmd += ["-N", str(concurrent)]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+    return _finish(cmd, output_dir, url)
+
+
 def build_playlist_command(
     url: str,
     base_dir: str | Path,

@@ -11,7 +11,7 @@ import questionary
 
 from ..core.environment import check_dependencies, js_runtime_tip
 from ..core.progress import ProgressEvent
-from ..core.runner import LogLine, RunResult
+from ..core.runner import LogLine, RunResult, run
 from ..intents.extract_audio import (
     AudioChoices,
     plan_extract_audio,
@@ -39,6 +39,21 @@ from ..intents.sponsorblock import (
     run_sponsorblock,
 )
 from ..intents.sections import SectionChoices, plan_section, run_section
+from ..intents.convert import ConvertChoices, plan_convert, run_convert
+from ..intents.extras import ExtrasChoices, plan_extras, run_extras
+from ..intents.live import LiveChoices, plan_live, run_live
+from ..intents.unlock import UnlockChoices, plan_unlock, run_unlock
+from ..intents.network import NetworkChoices, plan_network, run_network
+
+# Débit -> valeur yt-dlp (None = illimité).
+_RATES = {
+    "Illimité": None,
+    "5 Mo/s": "5M",
+    "2 Mo/s": "2M",
+    "1 Mo/s": "1M",
+    "500 Ko/s": "500K",
+}
+_BROWSERS = ["firefox", "chrome", "chromium", "edge", "brave", "opera", "vivaldi", "safari"]
 
 # Libellé -> code de catégorie SponsorBlock.
 _SB_CATEGORIES = {
@@ -51,7 +66,12 @@ _SB_CATEGORIES = {
     "Hors-sujet musical (clips)": "music_offtopic",
     "Remplissage (digressions)": "filler",
 }
-from ..core.probe import approx_size_for_height, probe_formats, video_heights
+from ..core.probe import (
+    approx_size_for_height,
+    probe_formats,
+    probe_info,
+    video_heights,
+)
 from .explain import explain_command
 
 _SUB_LANGS = {
@@ -108,42 +128,44 @@ def run_app() -> None:
     if tip:
         print(tip + "\n")
 
-    action = questionary.select(
-        "Que veux-tu faire ?",
-        choices=[
-            "🎬  Télécharger une vidéo",
-            "🎚️  Choisir la qualité (voir les formats réels)",
-            "📃  Télécharger une playlist / chaîne",
-            "🗂️  Fichier de liens (lot)",
-            "🚫  SponsorBlock (retirer sponsors/intros…)",
-            "✂️  Découper un extrait (HH:MM-HH:MM)",
-            "💬  Sous-titres",
-            "🎵  Extraire l'audio (MP3, …)",
-            questionary.Choice("➕  Autres intentions", disabled="bientôt disponible"),
-            "🚪  Quitter",
-        ],
-    ).ask()
+    # Libellé -> handler. Séparateurs pour grouper un menu devenu riche.
+    actions = {
+        "🎬  Télécharger une vidéo": _flow_download_video,
+        "🎵  Extraire l'audio (MP3, …)": _flow_extract_audio,
+        "🎚️  Choisir la qualité (formats réels)": _flow_choose_quality,
+        "📃  Télécharger une playlist / chaîne": _flow_download_playlist,
+        "🗂️  Fichier de liens (lot)": _flow_batch,
+        "✂️  Découper un extrait (HH:MM-HH:MM)": _flow_section,
+        "🔄  Convertir / changer de format": _flow_convert,
+        "🚫  SponsorBlock (retirer sponsors…)": _flow_sponsorblock,
+        "💬  Sous-titres": _flow_subtitles,
+        "🖼️  Miniature & métadonnées": _flow_extras,
+        "🔓  Débloquer (privé / géo / âge)": _flow_unlock,
+        "📺  Live / première": _flow_live,
+        "⚡  Vitesse / réseau": _flow_network,
+        "🔍  Inspecter (infos sans télécharger)": _flow_inspect,
+        "⬆️  Mettre à jour yt-dlp": _flow_update,
+    }
+    labels = list(actions)
+    choices = [
+        questionary.Separator("── Télécharger ──"),
+        *labels[0:5],
+        questionary.Separator("── Transformer ──"),
+        *labels[5:10],
+        questionary.Separator("── Cas particuliers ──"),
+        *labels[10:13],
+        questionary.Separator("── Outils ──"),
+        *labels[13:15],
+        questionary.Separator(" "),
+        "🚪  Quitter",
+    ]
+
+    action = questionary.select("Que veux-tu faire ?", choices=choices).ask()
 
     if _cancelled(action) or action.startswith("🚪"):
         print("À bientôt 👋")
         return
-
-    if action.startswith("🎬"):
-        _flow_download_video()
-    elif action.startswith("🎚️"):
-        _flow_choose_quality()
-    elif action.startswith("📃"):
-        _flow_download_playlist()
-    elif action.startswith("🗂️"):
-        _flow_batch()
-    elif action.startswith("🚫"):
-        _flow_sponsorblock()
-    elif action.startswith("✂️"):
-        _flow_section()
-    elif action.startswith("💬"):
-        _flow_subtitles()
-    else:
-        _flow_extract_audio()
+    actions[action]()
 
 
 def _flow_extract_audio() -> None:
@@ -560,6 +582,255 @@ def _flow_download_playlist() -> None:
     print("  Reprise : activée (archive anti-doublon — relancer reprend sans doublon)")
 
     _confirm_and_run(plan, run_download_playlist)
+
+
+def _ask_resolution():
+    """(ok, max_height). ok=False si annulé."""
+    label = questionary.select(
+        "Qualité (résolution) :", choices=list(_RESOLUTIONS),
+        default="Meilleure disponible",
+    ).ask()
+    if _cancelled(label):
+        return False, None
+    return True, _RESOLUTIONS[label]
+
+
+def _ask_media():
+    """(ok, media) parmi video/audio."""
+    sel = questionary.select("Type de contenu :", choices=["🎬  Vidéo", "🎵  Audio (MP3)"]).ask()
+    if _cancelled(sel):
+        return False, None
+    return True, ("audio" if sel.startswith("🎵") else "video")
+
+
+def _fmt_duration(sec) -> str:
+    if not sec:
+        return "?"
+    m, s = divmod(int(sec), 60)
+    h, m = divmod(m, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def _ask_url(prompt="URL de la vidéo :") -> str | None:
+    url = questionary.text(
+        prompt, validate=lambda v: True if v.strip() else "Entre une URL."
+    ).ask()
+    return None if _cancelled(url) else url.strip()
+
+
+def _flow_convert() -> None:
+    url = _ask_url()
+    if url is None:
+        return
+    fmt = questionary.select(
+        "Format cible :", choices=["mp4", "mkv", "webm", "mov", "avi"], default="mp4"
+    ).ask()
+    if _cancelled(fmt):
+        return
+    mode = questionary.select(
+        "Méthode :",
+        choices=[
+            "⚡ Remux (rapide, sans perte — change juste le conteneur)",
+            "🔁 Réencoder (plus lent, change vraiment le codec)",
+        ],
+    ).ask()
+    if _cancelled(mode):
+        return
+    recode = mode.startswith("🔁")
+
+    plan = plan_convert(ConvertChoices(url=url, target_ext=fmt, recode=recode))
+    print("\n── Récapitulatif ──")
+    print(f"  Format : {fmt}  ·  {'réencodage' if recode else 'remux (sans perte)'}")
+    print(f"  Dossier: {plan.output_dir}")
+    _confirm_and_run(plan, run_convert)
+
+
+def _flow_extras() -> None:
+    url = _ask_url()
+    if url is None:
+        return
+    scope = questionary.select(
+        "Portée :",
+        choices=[
+            "🎬  La vidéo + ses annexes (miniature/tags)",
+            "🖼️  Les annexes seules (sans télécharger la vidéo)",
+        ],
+    ).ask()
+    if _cancelled(scope):
+        return
+    skip = scope.startswith("🖼️")
+
+    write_thumb = questionary.confirm("Enregistrer la miniature (fichier image) ?",
+                                      default=skip).ask()
+    if _cancelled(write_thumb):
+        return
+    write_json = questionary.confirm("Enregistrer les infos (fichier .json) ?",
+                                     default=False).ask()
+    if _cancelled(write_json):
+        return
+    embed_thumb = embed_meta = False
+    if not skip:
+        embed_thumb = questionary.confirm("Incruster la miniature dans le fichier ?",
+                                          default=True).ask()
+        if _cancelled(embed_thumb):
+            return
+        embed_meta = questionary.confirm("Incruster les métadonnées (tags) ?",
+                                         default=True).ask()
+        if _cancelled(embed_meta):
+            return
+
+    plan = plan_extras(ExtrasChoices(
+        url=url, skip_download=skip, write_thumbnail=write_thumb,
+        write_info_json=write_json, embed_thumbnail=embed_thumb,
+        embed_metadata=embed_meta,
+    ))
+    print("\n── Récapitulatif ──")
+    print(f"  {'Annexes seules' if skip else 'Vidéo + annexes'}  ·  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_extras)
+
+
+def _flow_live() -> None:
+    url = _ask_url("URL du live / de la première :")
+    if url is None:
+        return
+    from_start = questionary.confirm(
+        "Démarrer depuis le début du live ?", default=True
+    ).ask()
+    if _cancelled(from_start):
+        return
+    wait = questionary.confirm(
+        "Attendre que la vidéo commence si elle est programmée ?", default=False
+    ).ask()
+    if _cancelled(wait):
+        return
+    ok, max_height = _ask_resolution()
+    if not ok:
+        return
+
+    plan = plan_live(LiveChoices(url=url, from_start=from_start, wait=wait,
+                                 max_height=max_height))
+    print("\n── Récapitulatif ──")
+    print(f"  Depuis le début : {'oui' if from_start else 'non'}  ·  "
+          f"Attente : {'oui' if wait else 'non'}")
+    print("  ⚠️  Un live peut durer longtemps — Ctrl+C pour arrêter proprement.")
+    print(f"  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_live)
+
+
+def _flow_unlock() -> None:
+    url = _ask_url()
+    if url is None:
+        return
+    print("  ℹ️  On réutilise les cookies de ton navigateur (session ouverte = accès "
+          "à tes vidéos privées/membres/âge). Ferme le navigateur si l'accès échoue.")
+    browser = questionary.select("Navigateur où tu es connecté :", choices=_BROWSERS,
+                                 default="firefox").ask()
+    if _cancelled(browser):
+        return
+    geo = questionary.confirm("Tenter aussi de contourner un blocage géographique ?",
+                              default=False).ask()
+    if _cancelled(geo):
+        return
+    ok, media = _ask_media()
+    if not ok:
+        return
+    max_height = None
+    if media == "video":
+        ok, max_height = _ask_resolution()
+        if not ok:
+            return
+
+    plan = plan_unlock(UnlockChoices(url=url, browser=browser, geo_bypass=geo,
+                                     media=media, max_height=max_height))
+    print("\n── Récapitulatif ──")
+    print(f"  Cookies : {browser}  ·  Géo-bypass : {'oui' if geo else 'non'}  ·  "
+          f"{'audio' if media == 'audio' else 'vidéo'}")
+    print(f"  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_unlock)
+
+
+def _flow_network() -> None:
+    url = _ask_url()
+    if url is None:
+        return
+    rate_label = questionary.select("Limite de débit :", choices=list(_RATES),
+                                    default="Illimité").ask()
+    if _cancelled(rate_label):
+        return
+    conc_label = questionary.select(
+        "Téléchargements parallèles (fragments) :",
+        choices=["1 (doux)", "4 (recommandé)", "8 (rapide)", "16 (agressif)"],
+        default="4 (recommandé)",
+    ).ask()
+    if _cancelled(conc_label):
+        return
+    concurrent = int(conc_label.split()[0])
+    ok, media = _ask_media()
+    if not ok:
+        return
+    max_height = None
+    if media == "video":
+        ok, max_height = _ask_resolution()
+        if not ok:
+            return
+
+    plan = plan_network(NetworkChoices(
+        url=url, limit_rate=_RATES[rate_label], concurrent=concurrent,
+        media=media, max_height=max_height,
+    ))
+    print("\n── Récapitulatif ──")
+    print(f"  Débit : {rate_label}  ·  Parallèle : {concurrent}  ·  "
+          f"{'audio' if media == 'audio' else 'vidéo'}")
+    print(f"  Dossier : {plan.output_dir}")
+    _confirm_and_run(plan, run_network)
+
+
+def _flow_inspect() -> None:
+    url = _ask_url()
+    if url is None:
+        return
+    print("\n🔍  Analyse en cours…")
+    try:
+        info = probe_info(url)
+    except Exception:
+        print("❌  Impossible d'analyser cette URL (voir le message ci-dessus).")
+        return
+
+    print("\n── Fiche vidéo ──")
+    print(f"  Titre   : {info.title}")
+    print(f"  Chaîne  : {info.uploader}")
+    print(f"  Durée   : {_fmt_duration(info.duration)}"
+          + ("   🔴 EN DIRECT" if info.is_live else ""))
+    heights = info.heights
+    print(f"  Qualités: {', '.join(str(h) + 'p' for h in heights) if heights else '—'}")
+    print(f"  Sous-titres      : {', '.join(info.sub_langs) if info.sub_langs else '—'}")
+    print(f"  ST auto-générés  : {', '.join(info.auto_sub_langs) if info.auto_sub_langs else '—'}")
+    print("\n(Aucun téléchargement effectué.)")
+
+
+def _flow_update() -> None:
+    if not questionary.confirm(
+        "Vérifier et installer les mises à jour de yt-dlp ?", default=True
+    ).ask():
+        return
+    print("\n⏳  Mise à jour…")
+    logs: list[str] = []
+    result = None
+    try:
+        for ev in run(["yt-dlp", "-U"]):
+            if isinstance(ev, LogLine):
+                logs.append(ev.text)
+                print("  " + ev.text)
+            elif isinstance(ev, RunResult):
+                result = ev
+    except KeyboardInterrupt:
+        print("Interrompu.")
+        return
+    if result and result.ok:
+        print("✅  Terminé.")
+    else:
+        print("⚠️  Si yt-dlp a été installé via pip, mets-le à jour ainsi :")
+        print("     pip install -U yt-dlp   (ou : .venv/bin/pip install -U yt-dlp)")
 
 
 def _confirm_and_run(plan, run_fn) -> None:
