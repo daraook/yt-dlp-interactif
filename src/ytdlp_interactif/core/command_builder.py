@@ -107,6 +107,39 @@ def build_playlist_command(
     return cmd
 
 
+def build_sponsorblock_command(
+    url: str,
+    output_dir: str | Path,
+    *,
+    action: str = "remove",  # "remove" (couper) | "mark" (chapitres)
+    categories: str = "sponsor",
+    max_height: int | None = None,
+    prefer_compatible: bool = True,
+    merge_format: str = "mp4",
+    embed_metadata: bool = True,
+    yt_dlp: str = "yt-dlp",
+) -> list[str]:
+    """Télécharge une vidéo en retirant (ou marquant) les segments SponsorBlock.
+
+    `categories` : liste séparée par des virgules (sponsor, intro, outro,
+    selfpromo, interaction, preview, music_offtopic, filler) ou "all"/"default".
+    """
+    cmd: list[str] = [yt_dlp, "-f", _video_format_selector(max_height)]
+    if prefer_compatible:
+        cmd += ["-S", "vcodec:h264,acodec:aac"]
+    cmd += ["--merge-output-format", merge_format]
+
+    flag = "--sponsorblock-mark" if action == "mark" else "--sponsorblock-remove"
+    cmd += [flag, categories]
+    if embed_metadata:
+        cmd.append("--embed-metadata")
+
+    cmd.append("--no-playlist")
+    template = str(Path(output_dir) / "%(title)s.%(ext)s")
+    cmd += ["-o", template, url]
+    return cmd
+
+
 def build_batch_command(
     output_dir: str | Path,
     *,

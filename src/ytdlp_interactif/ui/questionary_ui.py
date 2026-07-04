@@ -33,6 +33,23 @@ from ..intents.subtitles import (
     run_subtitles,
 )
 from ..intents.batch import BatchChoices, plan_batch, run_batch
+from ..intents.sponsorblock import (
+    SponsorBlockChoices,
+    plan_sponsorblock,
+    run_sponsorblock,
+)
+
+# Libellé -> code de catégorie SponsorBlock.
+_SB_CATEGORIES = {
+    "Sponsors (pubs intégrées)": "sponsor",
+    "Auto-promotion": "selfpromo",
+    "Rappels d'abonnement / interaction": "interaction",
+    "Intro": "intro",
+    "Outro / cartes de fin": "outro",
+    "Aperçu / récap": "preview",
+    "Hors-sujet musical (clips)": "music_offtopic",
+    "Remplissage (digressions)": "filler",
+}
 from ..core.probe import approx_size_for_height, probe_formats, video_heights
 from .explain import explain_command
 
@@ -97,6 +114,7 @@ def run_app() -> None:
             "🎚️  Choisir la qualité (voir les formats réels)",
             "📃  Télécharger une playlist / chaîne",
             "🗂️  Fichier de liens (lot)",
+            "🚫  SponsorBlock (retirer sponsors/intros…)",
             "💬  Sous-titres",
             "🎵  Extraire l'audio (MP3, …)",
             questionary.Choice("➕  Autres intentions", disabled="bientôt disponible"),
@@ -116,6 +134,8 @@ def run_app() -> None:
         _flow_download_playlist()
     elif action.startswith("🗂️"):
         _flow_batch()
+    elif action.startswith("🚫"):
+        _flow_sponsorblock()
     elif action.startswith("💬"):
         _flow_subtitles()
     else:
@@ -316,6 +336,59 @@ def _flow_batch() -> None:
     print(f"  Dossier : {plan.output_dir}")
 
     _confirm_and_run(plan, run_batch)
+
+
+def _flow_sponsorblock() -> None:
+    url = questionary.text(
+        "URL de la vidéo :",
+        validate=lambda v: True if v.strip() else "Entre une URL.",
+    ).ask()
+    if _cancelled(url):
+        return
+    url = url.strip()
+
+    action_sel = questionary.select(
+        "Que faire des segments ?",
+        choices=[
+            "✂️  Les couper (retirer de la vidéo)",
+            "🔖  Les marquer en chapitres (garder, mais repérables)",
+        ],
+    ).ask()
+    if _cancelled(action_sel):
+        return
+    action = "mark" if action_sel.startswith("🔖") else "remove"
+
+    cat_choices = [
+        questionary.Choice(label, checked=(code == "sponsor"))
+        for label, code in _SB_CATEGORIES.items()
+    ]
+    selected = questionary.checkbox(
+        "Catégories à traiter (espace pour cocher) :", choices=cat_choices
+    ).ask()
+    if _cancelled(selected):
+        return
+    codes = [_SB_CATEGORIES[l] for l in selected] if selected else ["sponsor"]
+    categories = ",".join(codes)
+
+    res_label = questionary.select(
+        "Qualité (résolution) :", choices=list(_RESOLUTIONS),
+        default="Meilleure disponible",
+    ).ask()
+    if _cancelled(res_label):
+        return
+
+    choices = SponsorBlockChoices(
+        url=url, action=action, categories=categories,
+        max_height=_RESOLUTIONS[res_label],
+    )
+    plan = plan_sponsorblock(choices)
+
+    print("\n── Récapitulatif ──")
+    print(f"  Action    : {'couper' if action == 'remove' else 'marquer'}")
+    print(f"  Catégories: {categories}")
+    print(f"  Dossier   : {plan.output_dir}")
+
+    _confirm_and_run(plan, run_sponsorblock)
 
 
 def _flow_subtitles() -> None:
