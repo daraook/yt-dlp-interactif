@@ -264,8 +264,6 @@ est décrite dans [`docs/GUIDE-METHODOLOGIE.md`](docs/GUIDE-METHODOLOGIE.md).
   interactive à n'importe quel outil en ligne de commande (méthode réutilisable).
 - [`docs/reference/cartographie-yt-dlp.md`](docs/reference/cartographie-yt-dlp.md) —
   cartographie complète de yt-dlp (17 groupes, 255 options) et couche « intentions ».
-- [`docs/spec-extraire-audio.md`](docs/spec-extraire-audio.md) — exemple de spécification
-  comportementale (première intention).
 
 ## Signaler un problème & contribuer
 
