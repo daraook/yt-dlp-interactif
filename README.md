@@ -48,12 +48,47 @@ téléchargement (ex. *playlist entière + audio seul + retirer les sponsors + s
 À chaque étape, un choix **« voir la commande »** affiche la commande `yt-dlp` exécutée
 et **explique chaque option** — pour apprendre en faisant (masqué par défaut).
 
-## Multi-plateforme
+## Ce que fait (et ne fait pas) cet outil
+
+**Cet outil n'est qu'une interface interactive pour `yt-dlp`.** Il ne télécharge rien
+lui-même : il présente les options, pose les bonnes questions, **construit la commande**
+`yt-dlp` correcte et l'exécute à ta place. Tout le travail de téléchargement, d'extraction
+et de conversion est fait par **yt-dlp** (et ffmpeg).
+
+Concrètement, notre responsabilité s'arrête à : proposer des choix clairs, construire des
+commandes correctes, lancer l'exécution, suivre la progression et **traduire les messages
+d'erreur**. Si un téléchargement échoue ou qu'un site pose problème, la cause est
+quasiment toujours **côté yt-dlp ou côté plateforme**, pas côté interface. Dans ce cas,
+l'outil te le dit clairement et te propose, quand elle existe, une **solution sûre**
+(ex. relancer avec le solveur anti-robot de YouTube) ; sinon il te renvoie vers le
+[projet officiel yt-dlp](https://github.com/yt-dlp/yt-dlp) — pense d'abord à **mettre à
+jour yt-dlp**, beaucoup de pannes de sites sont corrigées en quelques jours.
+
+> **Transcription ?** Non : l'outil ne transcrit pas l'audio en texte (pas de speech-to-text).
+> Il peut **récupérer les sous-titres existants**, y compris ceux **auto-générés par la
+> plateforme** (surtout YouTube), sous forme de fichiers `.srt` — c'est YouTube qui produit
+> cette transcription, pas nous.
+
+### Multi-plateforme
 
 L'outil ne se limite pas à YouTube : les URLs sont passées telles quelles à yt-dlp, qui
 gère **~1 800 sites** (Vimeo, Dailymotion, TikTok, SoundCloud, X/Twitter, Facebook, Twitch…),
-plus les fichiers média directs via l'extracteur générique. Seul **SponsorBlock** est
-spécifique à YouTube.
+plus les fichiers média directs via l'extracteur générique.
+
+### Fonctions spécifiques à YouTube
+
+Certains usages ne concernent **que YouTube** (ils sont marqués comme tels dans les menus) :
+
+| Fonction | Pourquoi YouTube seulement |
+|---------|----------------------------|
+| **SponsorBlock** | S'appuie sur la base communautaire SponsorBlock, alimentée pour YouTube. |
+| **Chercher par mots-clés** | La recherche interroge la page de résultats YouTube. Pour un autre site, colle son URL. |
+| **Sous-titres auto-générés** | La transcription automatique existe surtout sur YouTube. |
+| **Vérification anti-robot / Deno** | Le défi JavaScript (« not a bot », nsig, PO Token) et son solveur ne concernent que YouTube. |
+| **Repli de format léger** | Quand une vidéo n'a pas de piste audio séparée, le repli sur un flux léger utilise un format propre à YouTube. |
+
+Sur les autres sites, ces options se contentent de ne rien changer (elles retombent sur le
+comportement générique de yt-dlp).
 
 ## Prérequis
 
@@ -206,6 +241,10 @@ pour en discuter, puis une *pull request*. La marche à suivre (installation dev
 ajout d'une intention) est détaillée dans [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Toute idée d'amélioration ou d'ajout est aussi la bienvenue — propose-la en *issue*.
+
+Pour aller plus loin : [`CHANGELOG.md`](CHANGELOG.md) (historique des versions) ·
+[`SECURITY.md`](SECURITY.md) (signaler une faille) ·
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) (règles de la communauté).
 
 ## Feuille de route
 

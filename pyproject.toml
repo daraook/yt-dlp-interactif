@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ytdlp-interactif"
-version = "0.1.0"
+version = "1.0.0"
 description = "Interface interactive qui rend yt-dlp accessible à tous"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,13 +12,30 @@ license = { file = "LICENSE" }
 authors = [{ name = "Daraook" }]
 keywords = ["yt-dlp", "youtube", "downloader", "cli", "interactive", "tui"]
 dependencies = ["questionary>=2.1"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: French",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Utilities",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.urls]
+Homepage = "https://github.com/daraook/yt-dlp-interactif"
 Repository = "https://github.com/daraook/yt-dlp-interactif"
 Issues = "https://github.com/daraook/yt-dlp-interactif/issues"
+Changelog = "https://github.com/daraook/yt-dlp-interactif/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ytdlp-interactif = "ytdlp_interactif.__main__:main"
@@ -28,3 +45,8 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

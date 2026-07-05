@@ -1,0 +1,14 @@
+# Normalise les fins de ligne : LF dans le dépôt pour tout le texte.
+* text=auto eol=lf
+
+# Fichiers binaires : ne jamais convertir.
+*.gif binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.mp3 binary
+
+# Exclut les artefacts de dépôt des archives et des statistiques de langage.
+docs/reference/*.txt linguist-generated=true
+docs/reference/*.json linguist-generated=true
+tests/** linguist-detectable=false
