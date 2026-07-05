@@ -20,6 +20,7 @@ def test_defauts_compatible_mp4():
         "-S", "vcodec:h264,acodec:aac",
         "--embed-metadata",
         "--no-playlist",
+        "--replace-in-metadata", "title", r"\.(mp4|mkv|mov|avi|webm|flv|m4v|ts|3gp)$", "",
         "-o", "/out/%(title)s.%(ext)s",
         "URL",
     ]

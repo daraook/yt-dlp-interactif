@@ -10,6 +10,28 @@ from pathlib import Path
 # Conteneurs audio qui ne portent pas de pochette incrustée.
 _SANS_POCHETTE = {"wav", "flac"}
 
+# Sélecteur audio par défaut. Ordre : piste audio seule si elle existe, sinon
+# repli sur l'itag 18 (360p mp4 muxé, léger, ~300 Mo côté YouTube) plutôt que de
+# laisser `best` choisir un flux HLS fragmenté de ~1 Go pour le même son final.
+# `18` ne matche que YouTube ; ailleurs on retombe simplement sur `best`.
+_AUDIO_SELECTOR = "bestaudio/18/best"
+
+# Retire une extension vidéo résiduelle en fin de titre pour éviter une double
+# extension dans le nom de fichier (ex. titre « clip.mp4 » -> « clip.mp4.mp3 »).
+_CLEAN_TITLE = [
+    "--replace-in-metadata", "title",
+    r"\.(mp4|mkv|mov|avi|webm|flv|m4v|ts|3gp)$", "",
+]
+
+
+def _output(cmd: list[str], template: str | Path, url: str | None = None) -> list[str]:
+    """Ajoute le nettoyage de titre puis le template de sortie (et l'URL au besoin)."""
+    cmd += _CLEAN_TITLE
+    cmd += ["-o", str(template)]
+    if url is not None:
+        cmd.append(url)
+    return cmd
+
 
 def build_extract_audio_command(
     url: str,
@@ -20,13 +42,14 @@ def build_extract_audio_command(
     embed_thumbnail: bool = True,
     embed_metadata: bool = True,
     playlist: bool = False,
-    format_selector: str | None = "bestaudio/best",
+    format_selector: str | None = _AUDIO_SELECTOR,
     yt_dlp: str = "yt-dlp",
 ) -> list[str]:
     """Retourne la liste d'arguments prête pour subprocess (voir spec §3).
 
-    `format_selector` (défaut `bestaudio/best`) : ne télécharge que la piste audio
-    au lieu de la vidéo complète pour n'en garder que le son. None => yt-dlp décide.
+    `format_selector` (défaut `bestaudio/18/best`) : ne télécharge que la piste
+    audio si elle existe ; sinon un flux muxé léger plutôt que la vidéo complète,
+    dont on n'extrait que le son. None => yt-dlp décide.
     """
     cmd: list[str] = [yt_dlp, "-x"]
     if format_selector:
@@ -42,9 +65,7 @@ def build_extract_audio_command(
 
     cmd.append("--yes-playlist" if playlist else "--no-playlist")
 
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)
 
 
 def _video_format_selector(max_height: int | None) -> str:
@@ -69,7 +90,7 @@ def _media_prefix(
 ) -> None:
     """Ajoute à `cmd` la sélection vidéo (fusion) OU audio (extraction)."""
     if media == "audio":
-        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["-x", "-f", _AUDIO_SELECTOR]
         cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
         if embed_thumbnail_audio and audio_format not in _SANS_POCHETTE:
             cmd.append("--embed-thumbnail")
@@ -82,8 +103,7 @@ def _media_prefix(
 
 def _finish(cmd: list[str], output_dir: str | Path, url: str) -> list[str]:
     cmd.append("--no-playlist")
-    cmd += ["-o", str(Path(output_dir) / "%(title)s.%(ext)s"), url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)
 
 
 def build_custom_command(
@@ -160,8 +180,7 @@ def build_custom_command(
         cmd.append("--no-playlist")
         template = str(Path(output_dir) / "%(title)s.%(ext)s")
 
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, template, url)
 
 
 def build_convert_command(
@@ -339,7 +358,7 @@ def build_playlist_command(
     cmd: list[str] = [yt_dlp]
 
     if media == "audio":
-        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["-x", "-f", _AUDIO_SELECTOR]
         cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
         if embed_thumbnail and audio_format not in _SANS_POCHETTE:
             cmd.append("--embed-thumbnail")
@@ -362,8 +381,7 @@ def build_playlist_command(
     template = str(
         Path(base_dir) / "%(playlist_title)s" / "%(playlist_index)02d - %(title)s.%(ext)s"
     )
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, template, url)
 
 
 def build_section_command(
@@ -388,7 +406,7 @@ def build_section_command(
     """
     cmd: list[str] = [yt_dlp]
     if media == "audio":
-        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["-x", "-f", _AUDIO_SELECTOR]
         cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
         if audio_format not in _SANS_POCHETTE:
             cmd.append("--embed-thumbnail")
@@ -405,9 +423,7 @@ def build_section_command(
         cmd.append("--embed-metadata")
 
     cmd.append("--no-playlist")
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)
 
 
 def build_sponsorblock_command(
@@ -438,9 +454,7 @@ def build_sponsorblock_command(
         cmd.append("--embed-metadata")
 
     cmd.append("--no-playlist")
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)
 
 
 def build_batch_command(
@@ -467,7 +481,7 @@ def build_batch_command(
 
     cmd: list[str] = [yt_dlp]
     if media == "audio":
-        cmd += ["-x", "-f", "bestaudio/best"]
+        cmd += ["-x", "-f", _AUDIO_SELECTOR]
         cmd += ["--audio-format", audio_format, "--audio-quality", audio_quality]
         if audio_format not in _SANS_POCHETTE:
             cmd.append("--embed-thumbnail")
@@ -483,8 +497,7 @@ def build_batch_command(
     if batch_file:
         cmd += ["--batch-file", str(batch_file)]
 
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template]
+    _output(cmd, Path(output_dir) / "%(title)s.%(ext)s")
     if urls:
         cmd += list(urls)
     return cmd
@@ -533,9 +546,7 @@ def build_subtitles_command(
             cmd.append("--embed-metadata")
 
     cmd.append("--no-playlist")
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)
 
 
 def build_download_video_command(
@@ -575,6 +586,4 @@ def build_download_video_command(
         cmd.append("--embed-thumbnail")
     cmd.append("--yes-playlist" if playlist else "--no-playlist")
 
-    template = str(Path(output_dir) / "%(title)s.%(ext)s")
-    cmd += ["-o", template, url]
-    return cmd
+    return _output(cmd, Path(output_dir) / "%(title)s.%(ext)s", url)

@@ -33,6 +33,8 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--wait-for-video": (True, "Attendre qu'une vidéo/première programmée démarre (intervalle en s)."),
     "--cookies-from-browser": (True, "Réutiliser la session (cookies) d'un navigateur pour l'accès."),
     "--geo-bypass": (False, "Tenter de contourner les blocages géographiques."),
+    "--remote-components": (True, "Télécharger le solveur JS officiel (résout le défi anti-robot YouTube)."),
+    "--replace-in-metadata": (True, "Nettoyer un champ (ici retirer une extension résiduelle du titre)."),
     "-r": (True, "Limiter le débit de téléchargement (ex. 2M = 2 Mo/s)."),
     "-N": (True, "Nombre de fragments téléchargés en parallèle (plus vite)."),
     "--skip-download": (False, "Ne pas télécharger la vidéo (récupérer seulement les annexes)."),
@@ -43,6 +45,9 @@ _EXPLAIN: dict[str, tuple[bool, str]] = {
     "--embed-subs": (False, "Incruster les sous-titres dans le fichier vidéo."),
     "-o": (True, "Modèle de nom/chemin du fichier de sortie."),
 }
+
+# Options qui consomment plus d'un argument (défaut : 1 si takes_arg, sinon 0).
+_ARG_COUNT = {"--replace-in-metadata": 3}
 
 
 def explain_command(command: list[str]) -> list[str]:
@@ -62,9 +67,11 @@ def explain_command(command: list[str]) -> list[str]:
             i += 1
             continue
         takes_arg, text = info
-        if takes_arg and i + 1 < n:
-            lines.append(f"  {tok} {command[i + 1]}  →  {text}")
-            i += 2
+        nargs = _ARG_COUNT.get(tok, 1 if takes_arg else 0)
+        if nargs and i + nargs < n:
+            args = " ".join(command[i + 1 : i + 1 + nargs])
+            lines.append(f"  {tok} {args}  →  {text}")
+            i += 1 + nargs
         else:
             lines.append(f"  {tok}  →  {text}")
             i += 1

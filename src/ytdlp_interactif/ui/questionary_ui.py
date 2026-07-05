@@ -6,11 +6,13 @@ noyau (environment / intents / runner) et affiche les événements.
 from __future__ import annotations
 
 import os
+import shutil
+from dataclasses import replace
 
 import questionary
 
 from ..core.environment import check_dependencies, js_runtime_tip
-from ..core.errors import humanize_error
+from ..core.errors import humanize_error, is_bot_check
 from ..core.progress import ProgressEvent
 from ..core.runner import LogLine, RunResult, run
 from ..intents.extract_audio import (
@@ -148,7 +150,8 @@ def run_app() -> None:
         ("🔄  Convertir / changer de format", _flow_convert,
          "Change le conteneur (mp4/mkv/webm…). Remux = rapide sans perte ; réencoder = change le codec."),
         ("🚫  SponsorBlock", _flow_sponsorblock,
-         "Retire (ou marque en chapitres) les segments sponsors, intros, outros, auto-promo…"),
+         "Retire (ou marque en chapitres) les segments sponsors, intros, outros… "
+         "Spécifique à YouTube (base communautaire SponsorBlock)."),
         ("💬  Sous-titres", _flow_subtitles,
          "Récupère les sous-titres (avec ou sans la vidéo), par langue, incrustables, en .srt."),
         ("🖼️  Miniature & métadonnées", _flow_extras,
@@ -165,8 +168,9 @@ def run_app() -> None:
          "Vérifie et installe la dernière version de yt-dlp."),
         ("🧩  Personnalisé (tout combiner)", _flow_custom,
          "Empile les options à la carte : audio+playlist, sponsors+extrait+sous-titres, cookies, réseau…"),
-        ("🔎  Chercher (vidéos & playlists)", _flow_search,
-         "Cherche par mots-clés, liste vidéos ET playlists trouvées, puis télécharge ton choix."),
+        ("🔎  Chercher sur YouTube (vidéos & playlists)", _flow_search,
+         "Cherche sur YouTube par mots-clés, liste vidéos ET playlists, puis télécharge ton choix. "
+         "La recherche interroge YouTube ; pour un autre site, colle directement son URL."),
     ]
     handlers = {label: fn for label, fn, _ in menu}
 
@@ -542,6 +546,8 @@ def _flow_subtitles() -> None:
             return
         langs = langs.strip()
 
+    print("  ℹ️  Les sous-titres auto-générés (transcription automatique) existent surtout "
+          "sur YouTube. Cet outil ne transcrit pas lui-même : il récupère ceux fournis par le site.")
     auto = questionary.confirm(
         "Inclure les sous-titres auto-générés ?", default=True
     ).ask()
@@ -1081,49 +1087,134 @@ def _confirm_and_run(plan, run_fn) -> None:
         print("Annulé.")
         return
 
-    _execute(run_fn(plan), plan.output_dir)
+    _execute(plan, run_fn)
 
 
-def _execute(events, output_dir) -> None:
-    print()
+def _with_ejs(plan):
+    """Nouveau plan avec le solveur JS distant officiel (défi anti-robot YouTube)."""
+    cmd = plan.command
+    return replace(plan, command=[cmd[0], "--remote-components", "ejs:github", *cmd[1:]])
+
+
+def _run_and_collect(events):
+    """Consomme le flux d'événements (affiche la progression) et renvoie (result, logs)."""
     logs: list[str] = []
     postproc_announced = False
     result: RunResult | None = None
+    for ev in events:
+        if isinstance(ev, ProgressEvent):
+            if ev.phase == "download" and ev.percent is not None:
+                print(f"\r  ⬇️  Téléchargement… {ev.percent:5.1f}%", end="", flush=True)
+            elif ev.phase == "postproc" and not postproc_announced:
+                postproc_announced = True
+                print("\r  ⚙️  Finalisation (fusion / conversion)…        ")
+        elif isinstance(ev, LogLine):
+            logs.append(ev.text)
+        elif isinstance(ev, RunResult):
+            result = ev
+    return result, logs
 
+
+def _report_success(output_dir) -> None:
+    # Listing récursif (les playlists rangent dans des sous-dossiers).
+    files = sorted(p for p in output_dir.rglob("*") if p.is_file()) \
+        if output_dir.exists() else []
+    print("✅  Terminé !")
+    print(f"   📁 {output_dir}")
+    for p in files[:10]:
+        print(f"   • {p.relative_to(output_dir)}")
+    if len(files) > 10:
+        print(f"   … et {len(files) - 10} autres fichiers")
+
+
+def _failed_items(detail: list[str]) -> list[str]:
+    """Lignes d'échec définitif dans un lot (ERROR: ou 'Giving up after N retries')."""
+    return [ln for ln in detail if ln.startswith("ERROR:") or "Giving up after" in ln]
+
+
+def _explain_failure_and_redirect(errors: list[str], logs: list[str]) -> None:
+    """Échec net : expliquer si on sait, sinon rassurer et renvoyer vers yt-dlp officiel."""
+    detail = errors + logs[-15:]
+    friendly = humanize_error(detail)
+    if friendly:
+        print("❌  " + friendly)
+    else:
+        print("❌  Le téléchargement a échoué, et l'erreur ne correspond à aucun cas connu.")
+        print("   Cet outil n'est qu'une interface : le téléchargement lui-même est réalisé")
+        print("   par yt-dlp. Cette erreur vient de yt-dlp ou de la plateforme, pas de")
+        print("   l'interface. Deux réflexes fiables :")
+        print("   • Mettre à jour yt-dlp (menu « ⬆️  Mettre à jour yt-dlp ») : beaucoup de")
+        print("     pannes de sites sont corrigées en quelques jours côté yt-dlp.")
+        print("   • Consulter la doc / les tickets : https://github.com/yt-dlp/yt-dlp/issues")
+    if questionary.confirm("Voir les détails techniques ?", default=False).ask():
+        for line in (errors + logs[-25:]):
+            print("   " + line)
+
+
+def _execute(plan, run_fn, *, ejs_retried: bool = False) -> None:
+    """Exécute le plan, affiche la progression puis un compte rendu clair.
+
+    Sur échec : (1) propose une solution sûre immédiate si elle existe (défi
+    anti-robot YouTube → solveur officiel) ; (2) distingue le succès partiel d'un
+    lot ; (3) sinon explique ou, à défaut, rassure et renvoie vers yt-dlp officiel.
+    """
+    output_dir = plan.output_dir
+    print()
     try:
-        for ev in events:
-            if isinstance(ev, ProgressEvent):
-                if ev.phase == "download" and ev.percent is not None:
-                    print(f"\r  ⬇️  Téléchargement… {ev.percent:5.1f}%", end="", flush=True)
-                elif ev.phase == "postproc" and not postproc_announced:
-                    postproc_announced = True
-                    print("\r  ⚙️  Finalisation (fusion / conversion)…        ")
-            elif isinstance(ev, LogLine):
-                logs.append(ev.text)
-            elif isinstance(ev, RunResult):
-                result = ev
+        result, logs = _run_and_collect(run_fn(plan))
     except KeyboardInterrupt:
         print("\n⏹️  Interrompu.")
         return
 
     print()
     if result is not None and result.ok:
-        # Listing récursif (les playlists rangent dans des sous-dossiers).
-        files = sorted(p for p in output_dir.rglob("*") if p.is_file()) \
-            if output_dir.exists() else []
-        print("✅  Terminé !")
+        _report_success(output_dir)
+        return
+
+    errors = result.errors if result else []
+    detail = errors + logs[-20:]
+    files = sorted(p for p in output_dir.rglob("*") if p.is_file()) \
+        if output_dir.exists() else []
+
+    # (1) Solution sûre immédiate : le défi anti-robot YouTube se résout avec le
+    # solveur officiel. On l'explique et on propose la relance en un clic.
+    if not ejs_retried and is_bot_check(detail):
+        print("⚠️  YouTube demande une vérification anti-robot pour ce contenu.")
+        print("   C'est fréquent et ça se règle : yt-dlp sait résoudre ce défi avec son")
+        print("   solveur JavaScript officiel. Les cookies seuls ne suffisent pas.")
+        if shutil.which("deno") is None:
+            print("   ⚠️  Deno (runtime JS) est requis pour ça — à installer une fois :")
+            print("      → curl -fsSL https://deno.land/install.sh | sh")
+        if questionary.confirm(
+            "Réessayer en activant le solveur officiel (--remote-components ejs:github) ?",
+            default=True,
+        ).ask():
+            _execute(_with_ejs(plan), run_fn, ejs_retried=True)
+            return
+        _explain_failure_and_redirect(errors, logs)
+        return
+
+    # (2) Succès partiel d'un lot : des fichiers existent malgré des échecs.
+    fails = _failed_items(detail)
+    if files and fails:
+        print(f"⚠️  Terminé avec des échecs : {len(files)} fichier(s) récupéré(s), "
+              f"{len(fails)} élément(s) en échec.")
         print(f"   📁 {output_dir}")
-        for p in files[:10]:
-            print(f"   • {p.relative_to(output_dir)}")
-        if len(files) > 10:
-            print(f"   … et {len(files) - 10} autres fichiers")
-    else:
-        errors = result.errors if result else []
-        friendly = humanize_error(errors + logs[-15:])
-        print("❌  " + (friendly or "Le téléchargement a échoué."))
-        if questionary.confirm("Voir les détails techniques ?", default=False).ask():
-            for line in (errors + logs[-25:]):
-                print("   " + line)
+        for line in fails[:10]:
+            print("   ✗ " + line)
+        if len(fails) > 10:
+            print(f"   … et {len(fails) - 10} autres échecs")
+        if "--download-archive" in plan.command:
+            print("   ℹ️  Les éléments réussis ne seront pas re-téléchargés (archive "
+                  "anti-doublon) : relancer ne reprend que les échecs.")
+            if questionary.confirm(
+                "Relancer maintenant pour réessayer les seuls échecs ?", default=True
+            ).ask():
+                _execute(plan, run_fn, ejs_retried=ejs_retried)
+        return
+
+    # (3) Échec net : expliquer, ou rassurer et renvoyer vers yt-dlp officiel.
+    _explain_failure_and_redirect(errors, logs)
 
 
 def _flow_download_video() -> None:

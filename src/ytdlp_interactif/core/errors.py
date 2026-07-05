@@ -47,3 +47,21 @@ def humanize_error(lines: list[str]) -> str | None:
         if re.search(pattern, blob):
             return message
     return None
+
+
+# Défi anti-robot YouTube : nécessite un runtime JS + le solveur distant officiel
+# (--remote-components ejs:github). Les cookies seuls ne suffisent pas.
+_BOT_CHECK = re.compile(
+    r"sign in to confirm you'?re not a bot|confirm you'?re not a bot|"
+    r"sign in to confirm you.?re not a bot",
+    re.IGNORECASE,
+)
+
+
+def is_bot_check(lines: list[str]) -> bool:
+    """True si l'échec est le défi anti-robot YouTube (solvable via ejs:github).
+
+    Fonction PURE. Sert à proposer une relance avec le solveur distant plutôt
+    que de renvoyer l'utilisateur vers une simple traduction d'erreur.
+    """
+    return bool(_BOT_CHECK.search("\n".join(lines)))

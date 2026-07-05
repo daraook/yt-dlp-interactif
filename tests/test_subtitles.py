@@ -24,6 +24,7 @@ def test_video_avec_sous_titres_par_defaut():
         "--convert-subs", "srt",
         "--embed-metadata",
         "--no-playlist",
+        "--replace-in-metadata", "title", r"\.(mp4|mkv|mov|avi|webm|flv|m4v|ts|3gp)$", "",
         "-o", "/out/%(title)s.%(ext)s",
         "URL",
     ]

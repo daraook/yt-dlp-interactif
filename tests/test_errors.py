@@ -1,5 +1,5 @@
 """Tests de la traduction des erreurs yt-dlp (pur)."""
-from ytdlp_interactif.core.errors import humanize_error
+from ytdlp_interactif.core.errors import humanize_error, is_bot_check
 
 
 def test_video_indisponible():
@@ -39,3 +39,13 @@ def test_erreur_inconnue_renvoie_none():
 
 def test_liste_vide():
     assert humanize_error([]) is None
+
+
+def test_bot_check_detecte():
+    assert is_bot_check(["ERROR: [youtube] x: Sign in to confirm you're not a bot"]) is True
+    assert is_bot_check(["ERROR: [youtube] x: Sign in to confirm you’re not a bot"]) is True
+
+
+def test_bot_check_faux_pour_autre_erreur():
+    assert is_bot_check(["ERROR: Video unavailable"]) is False
+    assert is_bot_check([]) is False

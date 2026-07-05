@@ -8,12 +8,13 @@ def test_defauts_donnent_la_commande_de_reference():
     assert cmd == [
         "yt-dlp",
         "-x",
-        "-f", "bestaudio/best",
+        "-f", "bestaudio/18/best",
         "--audio-format", "mp3",
         "--audio-quality", "192K",
         "--embed-thumbnail",
         "--embed-metadata",
         "--no-playlist",
+        "--replace-in-metadata", "title", r"\.(mp4|mkv|mov|avi|webm|flv|m4v|ts|3gp)$", "",
         "-o", "/out/%(title)s.%(ext)s",
         "URL",
     ]
@@ -44,3 +45,20 @@ def test_playlist_utilise_yes_playlist():
     cmd = build_extract_audio_command("URL", output_dir="/out", playlist=True)
     assert "--yes-playlist" in cmd
     assert "--no-playlist" not in cmd
+
+
+def test_selecteur_audio_replie_sur_muxe_leger():
+    """Pas d'audio-only ? Repli sur itag 18 (léger) avant best, pas un HLS lourd."""
+    cmd = build_extract_audio_command("URL", output_dir="/out")
+    assert cmd[cmd.index("-f") + 1] == "bestaudio/18/best"
+
+
+def test_nettoyage_extension_residuelle_du_titre():
+    """Une extension vidéo en fin de titre est retirée avant nommage (anti double .ext)."""
+    cmd = build_extract_audio_command("URL", output_dir="/out")
+    i = cmd.index("--replace-in-metadata")
+    assert cmd[i + 1] == "title"
+    assert cmd[i + 2].endswith("$") and "mp4" in cmd[i + 2]
+    assert cmd[i + 3] == ""
+    # Le nettoyage précède le template de sortie.
+    assert i < cmd.index("-o")

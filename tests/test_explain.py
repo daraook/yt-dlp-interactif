@@ -8,7 +8,7 @@ def test_chaque_option_est_expliquee_et_url_identifiee():
     lines = explain_command(cmd)
     joined = "\n".join(lines)
     assert "-x" in joined and "audio" in joined.lower()
-    assert "-f bestaudio/best" in joined
+    assert "-f bestaudio/18/best" in joined
     assert "--audio-quality 192K" in joined
     # L'URL est identifiée comme telle.
     assert any("l'URL à télécharger" in line and "https://x/v" in line for line in lines)
