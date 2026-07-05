@@ -101,6 +101,33 @@ comportement générique de yt-dlp).
 
 ## Installation
 
+Deux chemins : le **script tout-en-un** (le plus simple, recommandé) ou l'**installation
+manuelle** (si tu préfères tout maîtriser).
+
+### Le plus simple — un seul script (vérifie et installe tout)
+
+Le script vérifie Python, yt-dlp et ffmpeg, **propose d'installer ce qui manque**, puis
+installe l'outil. Il ne fait rien sans te demander.
+
+**Windows** (PowerShell) :
+
+```powershell
+irm https://raw.githubusercontent.com/daraook/yt-dlp-interactif/main/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+**Linux / macOS** :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/daraook/yt-dlp-interactif/main/install.sh | bash
+```
+
+Puis lance : `ytdlp-interactif`. Le script utilise `winget` (Windows) ou
+`apt`/`dnf`/`brew` (Linux/macOS) pour les dépendances manquantes.
+
+---
+
+### Installation manuelle
+
 **Étape commune — installer yt-dlp et ffmpeg** (requis, quelle que soit l'option) :
 
 | Système | Commande |
@@ -112,9 +139,9 @@ comportement générique de yt-dlp).
 > Si le `yt-dlp` de ta distribution est ancien : `pip install -U yt-dlp` (ou l'option
 > « Mettre à jour yt-dlp » dans l'outil).
 
-Ensuite, choisis **une** des deux options ci-dessous.
+Ensuite, choisis **une** des options ci-dessous.
 
-### Option A — Simple (recommandée) · via pipx
+#### Option A — Simple (recommandée) · via pipx
 
 `pipx` installe l'outil de façon isolée et le rend disponible partout, sur
 **Linux, macOS et Windows**. Il gère l'environnement pour toi.
@@ -142,7 +169,7 @@ ytdlp-interactif
 > Pour mettre à jour plus tard : `pipx upgrade ytdlp-interactif`.
 > Pour désinstaller : `pipx uninstall ytdlp-interactif`.
 
-### Option B — Manuelle · via un environnement virtuel
+#### Option B — Manuelle · via un environnement virtuel
 
 Pour celles et ceux qui préfèrent tout maîtriser, ou pour **développer** (voir aussi
 [`CONTRIBUTING.md`](CONTRIBUTING.md)) :
@@ -156,7 +183,7 @@ python3 -m venv .venv
 
 Lancement : `.venv/bin/ytdlp-interactif`
 
-### Option C — Depuis une release publiée (wheel, sans cloner)
+#### Option C — Depuis une release publiée (wheel, sans cloner)
 
 Chaque version taguée publie un **wheel** prêt à installer dans les
 [Releases GitHub](https://github.com/daraook/yt-dlp-interactif/releases) — pas besoin de
@@ -172,7 +199,7 @@ pipx install https://github.com/daraook/yt-dlp-interactif/releases/download/vX.Y
 
 Lance la commande selon ton installation :
 
-- Installé avec **pipx** (Option A) : `ytdlp-interactif`
+- Installé avec le **script** ou **pipx** : `ytdlp-interactif` (depuis n'importe où)
 - Installé avec **venv** (Option B) : `.venv/bin/ytdlp-interactif`
 
 Navigue avec ↑↓, valide avec Entrée. Les fichiers atterrissent dans
