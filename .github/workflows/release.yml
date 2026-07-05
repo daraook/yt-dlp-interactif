@@ -1,0 +1,39 @@
+name: Release
+
+# Sur un tag « vX.Y.Z », construit le paquet et l'attache à une release GitHub.
+# Aucune contrainte PyPI : l'install se fait ensuite via l'URL du wheel publié.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Construire le wheel et le sdist
+        run: |
+          pip install build
+          python -m build
+
+      - name: Vérifier les artefacts
+        run: ls -l dist/
+
+      - name: Publier la release avec les artefacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${GITHUB_REF_NAME}"
+          dist/*
+          --title "${GITHUB_REF_NAME}"
+          --generate-notes
+          --verify-tag

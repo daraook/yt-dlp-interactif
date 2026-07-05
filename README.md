@@ -156,6 +156,18 @@ python3 -m venv .venv
 
 Lancement : `.venv/bin/ytdlp-interactif`
 
+### Option C — Depuis une release publiée (wheel, sans cloner)
+
+Chaque version taguée publie un **wheel** prêt à installer dans les
+[Releases GitHub](https://github.com/daraook/yt-dlp-interactif/releases) — pas besoin de
+`git`, ni de PyPI. Remplace `X.Y.Z` par la version voulue :
+
+```bash
+pipx install https://github.com/daraook/yt-dlp-interactif/releases/download/vX.Y.Z/ytdlp_interactif-X.Y.Z-py3-none-any.whl
+```
+
+> `pip install <url-du-.whl>` fonctionne aussi (dans un environnement virtuel).
+
 ## Utilisation
 
 Lance la commande selon ton installation :
